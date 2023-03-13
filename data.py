@@ -88,12 +88,14 @@ class GroupedTrainDataset(Dataset):
                                                                  max_gen_length=cur_max_length,
                                                                  padding=True)
         inputs_idx = inputs['input_ids'].tolist()[0]
+        start_idx = inputs_idx.index(50006)
         try:
             end_idx = inputs_idx.index(50007) - 1
         except:
             end_idx = inputs['input_ids'].shape[1] - 1
         # print(end_idx, inputs['input_ids'].shape)
-        generation_mask = [1] * end_idx + [0] * (inputs['input_ids'].shape[1] - end_idx)
+        generation_mask = [0] * start_idx + [1] * (end_idx - start_idx) + [0] * (
+                    inputs['input_ids'].shape[1] - end_idx)
         inputs['generation_mask'] = torch.tensor([generation_mask])
         return inputs
 
