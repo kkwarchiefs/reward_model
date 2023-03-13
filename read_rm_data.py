@@ -30,23 +30,5 @@ if __name__ == "__main__":
     ins = pd.read_csv(sys.argv[1])
     name2res = defaultdict(list)
     for v in ins.values:
-        name2res[v[2]].append([v[1], json.loads(v[3])])
-    model_ratio = defaultdict(dict)
-    model_score = defaultdict(int)
-    count = 0
-    for k, v in name2res.items():
-        for pair in v:
-            count += 1
-            res = []
-            for p in pair[1]:
-                res.append((str((p['model_id'], p['name'], p['level'])), p['level']))
-                ins = model_ratio[p['model_id']]
-                if p['level'] not in ins:
-                    ins[p['level']] = 1
-                else:
-                    ins[p['level']] += 1
-                model_score[p['model_id']] += p['level']
-    for k,v in model_score.items():
-        print(k, v/count)
-    for k, v in model_ratio.items():
-        print(k, {a: b/count for a,b in v.items()})
+        print(v[1], v[3], sep='\t')
+
