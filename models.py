@@ -27,6 +27,59 @@ from torch import nn
 from arguments import *
 import torch
 from transformers.modeling_outputs import SequenceClassifierOutput
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
+
+class RerankerTrainer(Trainer):
+    def evaluate(
+        self,
+        eval_dataset: Optional[Dataset] = None,
+        ignore_keys: Optional[List[str]] = None,
+        metric_key_prefix: str = "eval",
+    ) -> Dict[str, float]:
+        """
+        Run evaluation and returns metrics.
+
+        The calling script will be responsible for providing a method to compute metrics, as they are task-dependent
+        (pass it to the init `compute_metrics` argument).
+
+        You can also subclass and override this method to inject custom behavior.
+
+        Args:
+            eval_dataset (`Dataset`, *optional*):
+                Pass a dataset if you wish to override `self.eval_dataset`. If it is a [`~datasets.Dataset`], columns
+                not accepted by the `model.forward()` method are automatically removed. It must implement the `__len__`
+                method.
+            ignore_keys (`Lst[str]`, *optional*):
+                A list of keys in the output of your model (if it is a dictionary) that should be ignored when
+                gathering predictions.
+            metric_key_prefix (`str`, *optional*, defaults to `"eval"`):
+                An optional prefix to be used as the metrics key prefix. For example the metrics "bleu" will be named
+                "eval_bleu" if the prefix is "eval" (default)
+
+        Returns:
+            A dictionary containing the evaluation loss and the potential metrics computed from the predictions. The
+            dictionary also contains the epoch number which comes from the training state.
+        """
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
+        eval_dataloader = self.get_eval_dataloader(eval_dataset)
+        eval_loop = self.prediction_loop if self.args.use_legacy_prediction_loop else self.evaluation_loop
+        output = eval_loop(
+            eval_dataloader,
+            description="Evaluation",
+            # No point gathering the predictions if there are no metrics, otherwise we defer to
+            # self.args.prediction_loss_only
+            prediction_loss_only=True if self.compute_metrics is None else None,
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix,
+        )
+        print(eval_dataset, output.predictions)
+        for text, prediction in zip(self.eval_dataset, output.predictions):
+            print(text, prediction)
+        return output.metrics
+
 
 class Reranker(nn.Module):
     def __init__(self, hf_model, model_args: ModelArguments, data_args: DataTrainingArguments, train_args: TrainingArguments):
@@ -75,7 +128,7 @@ class Reranker(nn.Module):
                 **ranker_out,
             )
         else:
-            return ranker_out
+            return logits
 
     @classmethod
     def from_pretrained(

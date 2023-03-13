@@ -22,13 +22,13 @@ import os
 import random
 import sys
 from arguments import DataTrainingArguments, ModelArguments
-from data import GroupCollator, GroupedTrainDataset
+from data import GroupCollator, GroupedTrainDataset, PredictionDataset
 import datasets
 import evaluate
 import numpy as np
 from datasets import load_dataset
 import torch
-from models import Reranker
+from models import Reranker, RerankerTrainer
 
 import transformers
 from transformers import (
@@ -159,31 +159,36 @@ def main():
             train_dataset = train_dataset.select(range(max_train_samples))
 
         # Log a few random samples from the training set:
-        for index in random.sample(range(len(train_dataset)), 3):
-            for a in train_dataset[index]:
-                print([(k, v.shape, v) for k, v in a.items()])
+            for index in random.sample(range(len(train_dataset)), 3):
+                for a in train_dataset[index]:
+                    print([(k, v.shape, v) for k, v in a.items()])
             # logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
 
     if training_args.do_eval:
-        eval_dataset = GroupedTrainDataset(
-            data_args,
+        eval_dataset = PredictionDataset(
             data_args.dev_path,
-            tokenizer
+            tokenizer,
+            data_args.max_seq_length
         )
+        # if data_args.max_eval_samples is not None:
+        #     max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
+        #     eval_dataset = eval_dataset.select(range(max_eval_samples))
         if data_args.max_eval_samples is not None:
-            max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
-            eval_dataset = eval_dataset.select(range(max_eval_samples))
+            for index in random.sample(range(len(eval_dataset)), 1):
+                print(eval_dataset[index])
+                # print(a)
+                # print([(k, v.shape, v) for k, v in a.items()])
 
 
     if training_args.do_predict:
-        predict_dataset = GroupedTrainDataset(
-            data_args,
+        predict_dataset = PredictionDataset(
             data_args.pred_path,
-            tokenizer
+            tokenizer,
+            data_args.max_seq_length
         )
-        if data_args.max_predict_samples is not None:
-            max_predict_samples = min(len(predict_dataset), data_args.max_predict_samples)
-            predict_dataset = predict_dataset.select(range(max_predict_samples))
+        # if data_args.max_predict_samples is not None:
+        #     max_predict_samples = min(len(predict_dataset), data_args.max_predict_samples)
+        #     predict_dataset = predict_dataset.select(range(max_predict_samples))
 
 
     # Get the metric function
@@ -205,7 +210,7 @@ def main():
         data_collator = None
 
     # Initialize our Trainer
-    trainer = Trainer(
+    trainer = RerankerTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
@@ -242,9 +247,10 @@ def main():
 
         max_eval_samples = data_args.max_eval_samples if data_args.max_eval_samples is not None else len(eval_dataset)
         metrics["eval_samples"] = min(max_eval_samples, len(eval_dataset))
-
+        print(metrics)
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
+
 
     # Prediction
     if training_args.do_predict:

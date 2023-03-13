@@ -26,9 +26,18 @@ def read_user():
                 res.append((str((p['model_id'], p['name'], p['level'])), p['level']))
             res.sort(key=lambda x: x[1], reverse=True)
             print(k, pair[0], '\t'.join([a[0]for a in res]), sep='\t')
+
+def make_predict():
+    for line in sys.stdin:
+        prompt, resps = line.strip().split('\t')
+        response_list = json.loads(resps)
+        for candidate in response_list:
+            print(prompt, (candidate['name'].replace('\t', ''), ), candidate['level'], sep='\t')
+
 if __name__ == "__main__":
-    ins = pd.read_csv(sys.argv[1])
-    name2res = defaultdict(list)
-    for v in ins.values:
-        print(v[1], v[3], sep='\t')
+    make_predict()
+    # ins = pd.read_csv(sys.argv[1])
+    # name2res = defaultdict(list)
+    # for v in ins.values:
+    #     print(v[1], v[3], sep='\t')
 

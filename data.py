@@ -97,7 +97,7 @@ class GroupedTrainDataset(Dataset):
         generation_mask = [0] * start_idx + [1] * (end_idx - start_idx) + [0] * (
                     inputs['input_ids'].shape[1] - end_idx)
         inputs['generation_mask'] = torch.tensor([generation_mask])
-        return inputs
+        return {k: v.squeeze(0) for k, v in inputs.items()}
 
     def __len__(self):
         return self.total_len
@@ -129,13 +129,54 @@ class GroupedTrainDataset(Dataset):
             negs = random.choices(temp_response_pair, k=self.args.train_group_size)
         else:
             negs = random.sample(temp_response_pair, k=self.args.train_group_size)
-        cur_max_length = 512 - prompt_inputs['input_ids'].shape[1]
+        cur_max_length = self.args.max_seq_length - prompt_inputs['input_ids'].shape[1]
         for neg_entry in negs:
             left_inputs = self.create_one_example(prompt_inputs, neg_entry[0], cur_max_length)
             right_inputs = self.create_one_example(prompt_inputs, neg_entry[1], cur_max_length)
-            examples.append({k: v.squeeze(0) for k, v in left_inputs.items()})
-            examples.append({k: v.squeeze(0) for k, v in right_inputs.items()})
+            examples.append(left_inputs)
+            examples.append(right_inputs)
 
         # for e in examples:
         #     group_batch.append(self.create_one_example(e))
         return examples
+
+
+class PredictionDataset(Dataset):
+
+    def __init__(self, path_to_json: List[str], tokenizer: PreTrainedTokenizer, max_seq_length=128):
+        self.nlp_dataset = datasets.load_dataset(
+            'text',
+            data_files=path_to_json,
+        )['train']
+        self.tokenizer = tokenizer
+        self.max_seq_length = max_seq_length
+
+    def __len__(self):
+        return len(self.nlp_dataset)
+
+    def create_one_example(self, prompt_inputs, resp, cur_max_length):
+        inputs = self.tokenizer.build_inputs_for_generation(prompt_inputs, targets=resp,
+                                                                 max_gen_length=cur_max_length,
+                                                                 padding=True)
+        inputs_idx = inputs['input_ids'].tolist()[0]
+        start_idx = inputs_idx.index(50006)
+        try:
+            end_idx = inputs_idx.index(50007) - 1
+        except:
+            end_idx = inputs['input_ids'].shape[1] - 1
+        # print(end_idx, inputs['input_ids'].shape)
+        generation_mask = [0] * start_idx + [1] * (end_idx - start_idx) + [0] * (
+                    inputs['input_ids'].shape[1] - end_idx)
+        inputs['generation_mask'] = torch.tensor([generation_mask])
+        return {k: v.squeeze(0) for k, v in inputs.items()}
+
+    def __getitem__(self, item):
+        group = self.nlp_dataset[item]['text'].split('\t')
+        prompt = group[0] + "[gMASK]"
+        resp = eval(group[1])[0]
+        label = int(group[2])
+        prompt_inputs = self.tokenizer(prompt, return_tensors="pt", padding=True)
+        cur_max_length = self.max_seq_length - prompt_inputs['input_ids'].shape[1]
+        inputs = self.create_one_example(prompt_inputs, resp, cur_max_length)
+        inputs['level_label'] = label
+        return [inputs]
