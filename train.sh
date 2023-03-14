@@ -29,7 +29,7 @@ CUDA_VISIBLE_DEVICES=6  python3 reward_rank.py \
   --num_train_epochs 3.0 \
   --max_seq_length 512 \
   --evaluation_strategy steps \
-  --eval_steps 10 \
+  --eval_steps 100 \
   --output_dir output/rm_model \
   --overwrite_output_dir \
   --save_steps -1

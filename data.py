@@ -154,7 +154,7 @@ class PredictionDataset(Dataset):
     def __len__(self):
         return len(self.nlp_dataset)
 
-    def create_one_example(self, prompt_inputs, resp, cur_max_length):
+    def create_one_example(self, prompt_inputs, prompt, resp, cur_max_length):
         inputs = self.tokenizer.build_inputs_for_generation(prompt_inputs, targets=resp,
                                                                  max_gen_length=cur_max_length,
                                                                  padding=True)
@@ -177,6 +177,6 @@ class PredictionDataset(Dataset):
         label = int(group[2])
         prompt_inputs = self.tokenizer(prompt, return_tensors="pt", padding=True)
         cur_max_length = self.max_seq_length - prompt_inputs['input_ids'].shape[1]
-        inputs = self.create_one_example(prompt_inputs, resp, cur_max_length)
+        inputs = self.create_one_example(prompt_inputs, prompt, resp, cur_max_length)
         inputs['level_label'] = label
         return [inputs]

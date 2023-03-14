@@ -75,9 +75,15 @@ class RerankerTrainer(Trainer):
             ignore_keys=ignore_keys,
             metric_key_prefix=metric_key_prefix,
         )
-        print(eval_dataset, output.predictions)
-        for text, prediction in zip(self.eval_dataset, output.predictions):
-            print(text, prediction)
+        # print(self.eval_dataset, output.predictions)
+        fout = open('predictions.txt', 'w')
+        for ins, prediction in zip(self.eval_dataset, output.predictions):
+            # print(ins)
+            response = self.tokenizer.decode(ins[0]['input_ids'])
+            response = response.replace("<|startofpiece|>", "").replace("<|endofpiece|>", "").replace("<|endoftext|>","")
+            response = response.replace("<|startofpiece|>", "").replace("[回答]", "").replace("[CLS]", "").replace("\n", "").replace("<n>", "").replace(" ", "")
+            print(response, prediction, ins[0]['level_label'], sep='\t', file=fout)
+        fout.close()
         return output.metrics
 
 
@@ -112,7 +118,7 @@ class Reranker(nn.Module):
         ranker_out = self.hf_model(**batch, return_dict=True)
         last_hidden_states = ranker_out.last_hidden_states * batch['generation_mask'].unsqueeze(2)
         pooling_hidden_states = torch.sum(last_hidden_states, axis=1) / torch.sum(batch['generation_mask'], axis=1).unsqueeze(1)
-        logits = torch.sigmoid(self.project(pooling_hidden_states))
+        logits = self.project(pooling_hidden_states)
         # Add a clip to confine scores in [0, 1].
         # logits = torch.clamp(logits, 0, 1)
 
