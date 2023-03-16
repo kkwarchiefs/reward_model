@@ -140,8 +140,8 @@ def main():
     # dev_data_class = PredictionDataset
     model_class = SequenceClassify
     trainer_class = RerankerTrainer
-    train_data_class = GroupedTrainDatasetClassifyList
-    dev_data_class = PredictionDatasetClassify
+    train_data_class = GroupedTrainDatasetClassifyRandom
+    dev_data_class = PredictionDatasetClassifyRandom
     model = model_class.from_pretrained(model_args, data_args, training_args, model_args.model_name_or_path,
                              from_tf=bool(".ckpt" in model_args.model_name_or_path),
                              config=config,
