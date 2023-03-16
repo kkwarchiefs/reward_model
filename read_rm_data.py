@@ -34,10 +34,19 @@ def make_predict():
         for candidate in response_list:
             print(prompt, (candidate['name'].replace('\t', ''), ), candidate['level'], sep='\t')
 
+def read_dev(filename):
+    promptset = set()
+    for line in open(filename):
+        items = line.strip().split('\t')
+        promptset.add(items[0])
+    return promptset
+
 if __name__ == "__main__":
     make_predict()
-    # ins = pd.read_csv(sys.argv[1])
-    # name2res = defaultdict(list)
-    # for v in ins.values:
-    #     print(v[1], v[3], sep='\t')
+    # promptset = read_dev(sys.argv[1])
+    # promptset = set()
+    # for line in sys.stdin:
+    #     items = line.strip().split('\t')
+    #     if items[0] not in promptset:
+    #         print(items[0].replace('\n',''), items[2], sep='\t')
 

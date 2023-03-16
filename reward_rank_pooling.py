@@ -45,7 +45,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils.versions import require_version
-import time
+
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 # check_min_version("4.27.0.dev0")
@@ -57,6 +57,11 @@ logger = logging.getLogger(__name__)
 #
 # import os
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+import time
+# print("os LOCAL_RANK", os.environ["LOCAL_RANK"])
+# if int(os.environ["LOCAL_RANK"]) % 2 == 1:
+#     print("sleep some time" )
+
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -134,14 +139,14 @@ def main():
         trust_remote_code=True
     )
 
-    # model_class = Reranker
-    # trainer_class = RerankerTrainer
-    # train_data_class = GroupedTrainDataset
-    # dev_data_class = PredictionDataset
-    model_class = SequenceClassify
+    model_class = RerankerPair
     trainer_class = RerankerTrainer
-    train_data_class = GroupedTrainDatasetClassifyList
-    dev_data_class = PredictionDatasetClassify
+    train_data_class = GroupedTrainDataset
+    dev_data_class = PredictionDataset
+    # model_class = SequenceClassify
+    # trainer_class = RerankerTrainer
+    # train_data_class = GroupedTrainDatasetClassify
+    # dev_data_class = PredictionDatasetClassify
     model = model_class.from_pretrained(model_args, data_args, training_args, model_args.model_name_or_path,
                              from_tf=bool(".ckpt" in model_args.model_name_or_path),
                              config=config,
@@ -162,10 +167,11 @@ def main():
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
 
-        # Log a few random samples from the training set:
+            # Log a few random samples from the training set:
             for index in random.sample(range(len(train_dataset)), 3):
                 for a in train_dataset[index]:
                     print([(k, v.shape, v) for k, v in a.items()])
+                    print(torch.sum(a['generation_mask']))
             # logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
 
     if training_args.do_eval:

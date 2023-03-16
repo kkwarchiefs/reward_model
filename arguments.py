@@ -27,7 +27,7 @@ class DataTrainingArguments:
     )
     pred_path: List[str] = field(default=None, metadata={"help": "Path to prediction data"})
     train_group_size: Optional[int] = field(default=8, metadata={"help": "Path to prediction data"})
-
+    rank_list_size: Optional[int] = field(default=2, metadata={"help": "Path to prediction data"})
     max_seq_length: Optional[int] = field(
         default=128,
         metadata={
