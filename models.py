@@ -250,6 +250,10 @@ class SequenceClassify(nn.Module):
         # Add a clip to confine scores in [0, 1].
         # logits = torch.clamp(logits, 0, 1)
 
+        if self.model_args.temperature is not None:
+            assert self.model_args.temperature > 0
+            logits = logits / self.model_args.temperature
+
         if self.training:
             scores = logits.view(
                 -1,
@@ -275,3 +279,4 @@ class SequenceClassify(nn.Module):
 
     def save_pretrained(self, output_dir: str):
         self.hf_model.save_pretrained(output_dir)
+        self.config.save_pretrained(output_dir)

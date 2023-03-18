@@ -9,6 +9,7 @@ from __future__ import division
 from __future__ import print_function
 
 import json
+import random
 import sys
 import codecs
 import pandas as pd
@@ -40,6 +41,36 @@ def read_dev(filename):
         items = line.strip().split('\t')
         promptset.add(items[0])
     return promptset
+
+def read_file(file_name):
+    prompt2gpt = {}
+    for line in open(file_name):
+        ins = json.loads(line)
+        prompt2gpt[ins["prompt"]] = ins["response"]
+    return prompt2gpt
+
+def make_new_sort():
+    chat = read_file('./reward_data/chat_0317_all.json')
+    res = []
+    for line in sys.stdin:
+        try:
+            prompt, resps = line.strip().split('\t')
+        except:
+            print(line, file=sys.stderr)
+            continue
+        response_list = json.loads(resps)
+        good = chat.get(prompt)
+        if good:
+            response_list.append({
+                'name': good,
+                'level': 9
+            })
+            res.append((prompt, json.dumps(response_list, ensure_ascii=False)))
+        else:
+            res.append((prompt, resps))
+    random.shuffle(res)
+    for k, v in res:
+        print(k, v, sep='\t')
 
 if __name__ == "__main__":
     make_predict()

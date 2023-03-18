@@ -517,7 +517,7 @@ class PredictionDatasetClassifyRandom(Dataset):
     def __getitem__(self, item):
         group = self.nlp_dataset[item]['text'].split('\t')
         prompt = group[0]
-        resp = eval(group[1])[0]
+        resp = eval(group[1])[0].replace("\n", "<n>")
         label = int(group[2])
         ends = random.randint(20, 60)
         inputs = self.create_one_example(prompt, resp[:ends])

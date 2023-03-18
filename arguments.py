@@ -128,4 +128,5 @@ class ModelArguments:
         default=False,
         metadata={"help": "Will enable to load a pretrained model whose head dimensions are different."},
     )
+    temperature: Optional[float] = field(default=None)
 

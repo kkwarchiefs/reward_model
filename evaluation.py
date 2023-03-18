@@ -9,6 +9,7 @@ from __future__ import division
 from __future__ import print_function
 import sys
 import codecs
+import pandas as pd
 
 def pair_all():
     ranklist = []
