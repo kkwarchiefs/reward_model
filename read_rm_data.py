@@ -72,8 +72,29 @@ def make_new_sort():
     for k, v in res:
         print(k, v, sep='\t')
 
+def read_rm_datas():
+    for line in sys.stdin:
+        ins = json.loads(line)
+        status = False
+        for tk in ['建议选择B',  'B更好', "\n\nB好"]:
+            if tk in ins['response']:
+                print( (ins['response'], ), 1, sep='\t')
+                status = True
+                break
+        if status:
+            continue
+        status = False
+        for tk in ['建议选择A', 'A更好', "\n\nA好"]:
+            if tk in ins['response']:
+                print((ins['response'],), 1, sep='\t')
+                status = True
+                continue
+        if status:
+            continue
+        print((ins['response'],), file=sys.stderr)
+
 if __name__ == "__main__":
-    make_predict()
+    read_rm_datas()
     # promptset = read_dev(sys.argv[1])
     # promptset = set()
     # for line in sys.stdin:

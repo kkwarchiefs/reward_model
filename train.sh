@@ -85,12 +85,31 @@ python3 -m torch.distributed.launch --nproc_per_node 8 reward_rank.py \
   --per_device_eval_batch_size 8 \
   --logging_steps 20 \
   --train_group_size 3 \
-  --rank_list_size 3 \
+  --rank_list_size 1 \
   --learning_rate 3e-5 \
-  --num_train_epochs 1.0 \
-  --max_seq_length 256 \
+  --num_train_epochs 3.0 \
+  --max_seq_length 512 \
   --evaluation_strategy epoch \
-  --output_dir output/rm_model_chat \
+  --output_dir output/rm_model_short \
+  --overwrite_output_dir \
+  --save_steps -1
+
+python3 -m torch.distributed.launch --nproc_per_node 8 reward_rank_random.py \
+  --model_name_or_path /search/ai/pretrain_models/glm-large-chinese/ \
+  --do_train \
+  --do_eval \
+  --train_path /search/ai/jamsluo/GLM_RLHF/reward_model/reward_data/train.tsv \
+  --dev_path /search/ai/jamsluo/GLM_RLHF/reward_model/reward_data/dev.tsv \
+  --per_device_train_batch_size 1 \
+  --per_device_eval_batch_size 8 \
+  --logging_steps 20 \
+  --train_group_size 3 \
+  --rank_list_size 1 \
+  --learning_rate 3e-5 \
+  --num_train_epochs 3.0 \
+  --max_seq_length 512 \
+  --evaluation_strategy epoch \
+  --output_dir output/rm_model_short \
   --overwrite_output_dir \
   --save_steps -1
 

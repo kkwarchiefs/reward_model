@@ -440,8 +440,12 @@ class GroupedTrainDatasetClassifyRandom(Dataset):
             res_all.append(candidate['name'])
             response_dict[int(candidate['level'])].append(candidate['name'][:ends])
         response_dict[0].append(self.add_some_unmask())
-        for rsp_ in  random.sample(res_all, k=3):
+        if len(res_all) < 5:
+            return self.__getitem__(random.randint(0, self.total_len))
+        for rsp_ in random.sample(res_all, k=2):
             response_dict[0].append(rsp_[:20]+self.add_some_unmask())
+        for rsp_ in random.sample(res_all, k=2):
+            response_dict[0].append(self.add_some_unmask()+rsp_[:20])
         chat_resp = self.prompt2gpt.get(prompt)
         if chat_resp is not None:
             ends = random.randint(20, 60)
