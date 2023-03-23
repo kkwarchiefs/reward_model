@@ -33,6 +33,35 @@ python3 -m torch.distributed.launch --nproc_per_node 4  trans_classify_glm.py \
   --overwrite_output_dir \
   --save_steps -1
 
+python3 -m torch.distributed.launch --nproc_per_node 2  trans_classify_glm.py \
+  --model_name_or_path /search/ai/pretrain_models/glm-large-chinese/ \
+  --do_train \
+  --do_eval \
+  --do_predict \
+  --pred_path datas/resp_second/dev.tsv \
+  --train_path datas/resp_second/train.tsv \
+  --dev_path datas/resp_second/dev.tsv \
+  --per_device_train_batch_size 4 \
+  --learning_rate 5e-5 \
+  --num_train_epochs 3.0 \
+  --max_seq_length 600 \
+  --evaluation_strategy epoch \
+  --output_dir output/resp_format_sec \
+  --overwrite_output_dir \
+  --save_steps -1
+
+python3 -m torch.distributed.launch --nproc_per_node 4 trans_classify_glm.py \
+  --model_name_or_path output/resp_format \
+  --do_predict \
+  --pred_path datas/resp_format/pred.tsv \
+  --per_device_train_batch_size 2 \
+  --per_device_eval_batch_size 2 \
+  --output_dir output/multi_tasks2 \
+  --max_seq_length 512 \
+  --save_steps -1
+
+
+
 CUDA_VISIBLE_DEVICES=6  python3 reward_rank.py \
   --model_name_or_path /search/ai/pretrain_models/glm-large-chinese/ \
   --do_train \
@@ -233,6 +262,9 @@ CUDA_VISIBLE_DEVICES=0  python3 trans_classify.py \
   --output_dir output/multi_tasks2 \
   --max_seq_length 32 \
   --save_steps -1
+
+
+
 
 CUDA_VISIBLE_DEVICES=0  python3 trans_classify_pipeline.py \
   --model_name_or_path output/multi_tasks \

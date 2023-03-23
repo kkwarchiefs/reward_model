@@ -93,12 +93,63 @@ def read_rm_datas():
             continue
         print((ins['response'],), file=sys.stderr)
 
+def check_gpt():
+    for line in sys.stdin:
+        ins = json.loads(line)
+        print(ins['prompt'], '"' + ins['best'].replace('"', "'") + '"', '"' + ins['bad'].replace('<n>', "\n").replace('"', "'") + '"', sep='\t')
+
+def check_rsp():
+    for prompt, rsp in zip(open('./reward_data/top_5000_25000.csv'), open('./reward_data/toolgpt_0.6_5000_25000.txt')):
+        prompt = prompt.strip()
+        rsp = rsp.strip()
+        if '<n>' in prompt:
+            prompt = '"' + prompt.replace('<n>', "\n").replace('"', "'") + '"'
+        # if rsp.count('<n>') > 5:
+        #     continue
+        if '<n>' in rsp:
+            rsp = '"' + rsp.replace('<n>', "\n").replace('"', "'") + '"'
+        print(prompt, rsp.replace('<|startofpiece|>', ''), sep='\t')
+
+
+def check_rsp2():
+    for line in sys.stdin:
+        items = line.strip().split('\t')
+        rsp = '"' + items[0].replace('<n>', "\n").replace('[UNUSED1]', "\n").replace('"', "'") + '"'
+        print(rsp, '\t'.join(items[1:]), sep='\t')
+
+def read_set():
+    prompt2res = {}
+    for prompt, rsp in zip(open('./reward_data/top_5000_25000.csv'), open('./reward_data/toolgpt_0.6_5000_25000.txt')):
+        prompt = prompt.strip()
+        rsp = rsp.strip()
+        if '<n>' in prompt:
+            prompt = '"' + prompt.replace('<n>', "\n").replace('"', "'") + '"'
+        # if rsp.count('<n>') > 5:
+        #     continue
+        if '<n>' in rsp:
+            rsp = '"' + rsp.replace('<n>', "\n").replace('"', "'") + '"'
+        prompt2res[prompt] = rsp.replace('<|startofpiece|>', '')
+        # print(prompt, rsp.replace('<|startofpiece|>', ''), sep='\t')
+    for line in sys.stdin:
+        items = line.strip().split('\t')
+        rsp = items[1]
+        if items[0] in prompt2res:
+            if '<n>' in rsp:
+                rsp = '"' + rsp.replace('<n>', "\n").replace('"', "'") + '"'
+            print(items[0], prompt2res[items[0]], rsp, sep='\t')
+
+def prepare_train():
+    ins = pd.read_csv(sys.argv[1])
+    for v in ins.values:
+        if v[2] == -1:
+            continue
+        if v[2] != 0 and v[2] != 1:
+            print(v[2], file=sys.stderr)
+            continue
+        outs = v[0] + '[UNUSED1]' + v[1].replace('\n', '<n>')
+
+        print(outs.replace('\t', ''), int(v[2]), sep='\t')
+
 if __name__ == "__main__":
-    read_rm_datas()
-    # promptset = read_dev(sys.argv[1])
-    # promptset = set()
-    # for line in sys.stdin:
-    #     items = line.strip().split('\t')
-    #     if items[0] not in promptset:
-    #         print(items[0].replace('\n',''), items[2], sep='\t')
+    check_rsp2()
 

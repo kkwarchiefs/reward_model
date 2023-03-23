@@ -9,13 +9,17 @@ from __future__ import division
 from __future__ import print_function
 import sys
 import codecs
+
+import pandas
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import datetime
 import torch
 import json
-
+import pandas as pd
 # path = "/search/ai/kaitongyang/online/model/GLM-10B-chinese-customization_03-07-21-23"
 path = "/search/ai/kaitongyang/RLHF_DEBUG/PPO_trl/glm_0.5"
+path = "/search/ai/jamsluo/GLM_RLHF/ppo_glm/RLHF_MODEL_new_rm_glm_fb16/2_49"
+path = "/search/ai/jamsluo/GLM_RLHF/ppo_glm/RLHF_sft06_rm_large_new/2_149/"
 # path = '/search/ai/pretrain_models/glm-large-chinese/'
 device = "cuda:" + sys.argv[2]
 suffix = "[回答][gMASK]"
@@ -34,13 +38,12 @@ def build_inputs(texts):
     return inputs
 
 def generation_template(inputs, max_length, top_k, top_p, do_sample, temperature):
-    outputs = model.generate(**inputs, max_length=max_length, eos_token_id=tokenizer.eop_token_id, top_k=top_k, top_p=top_p, do_sample=do_sample, temperature=temperature)
+    outputs = model.generate(**inputs, max_new_tokens=512, eos_token_id=50007, top_k=20, top_p=0.6,repetition_penalty=1.3, do_sample=False)
+    # outputs = model.generate(**inputs, max_new_tokens=max_length, eos_token_id=tokenizer.eop_token_id, top_k=top_k, top_p=top_p, do_sample=do_sample, temperature=temperature)
     response_text = [tokenizer.decode(logits) for logits in outputs[:, inputs["input_ids"].size()[1]:].tolist()]
     return response_text[0]
 
-
-
-if __name__ == "__main__":
+def old_input():
     for line in open(sys.argv[1]):
         try:
             prompt, resps = line.strip().split('\t')
@@ -53,6 +56,19 @@ if __name__ == "__main__":
             print(prompt, generation_template(inputs, max_length=512, top_k=0, top_p=1.0, do_sample=True, temperature=1), sep='\t')
         except:
             continue
+
+def generate_form():
+    ins = pandas.read_csv('./classify_rm/prompt_format.csv')
+    print(ins)
+if __name__ == "__main__":
+    generate_form()
+    # for line in open(sys.argv[1]):
+    #     prompt = line.strip()
+    #     inputs = build_inputs(prompt)
+    #     try:
+    #         print(prompt, generation_template(inputs, max_length=512, top_k=0, top_p=1.0, do_sample=True, temperature=1), sep='\t')
+    #     except:
+    #         continue
         # for candidate in response_list:
         #     if candidate['level'] != 1:
         #         continue

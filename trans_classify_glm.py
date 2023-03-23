@@ -257,15 +257,15 @@ def main():
         trainer.log_metrics("predict", metrics)
         trainer.save_metrics("predict", metrics)
         print("Predict", predictions[0])
+        print("train max length: ", train_dataset.max_input_len)
         prediction_idx = np.argmax(predictions[0], axis=1)
         output_predict_file = os.path.join(training_args.output_dir, "predictions.txt")
         if trainer.is_world_process_zero():
             with open(output_predict_file, "w") as writer:
-                writer.write("index\tprediction\n")
-                for index, tups in enumerate(zip(prediction_idx, predictions[0])):
+                for index, tups in enumerate(zip(open(data_args.pred_path[0]), prediction_idx, predictions[0])):
                     # item = label_list[item]
-                    tmp = softmax(tups[1])
-                    writer.write(f"{index}\t{tups[0]}\t{tmp[tups[0]]}\n")
+                    tmp = softmax(tups[2])
+                    writer.write(f"{tups[0].strip()}\t{index}\t{tups[1]}\t{tmp[tups[1]]}\n")
 
 def softmax(x):
     return(np.exp(x)/np.exp(x).sum())

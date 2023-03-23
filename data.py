@@ -85,15 +85,17 @@ class TrainDatasetGLM(Dataset):
         self.SEP = [self.tokenizer.sep_token_id]
         self.args = args
         self.total_len = len(self.nlp_dataset)
+        self.max_input_len = 0
         print("self.total_len", self.total_len)
 
     def __len__(self):
         return self.total_len
 
     def create_one_example(self, resp):
-        resp = resp.replace("\n", "<n>")
+        resp = resp.replace("<|startofpiece|>", "").replace("<|endofpiece|>", "").replace("<|endoftext|>", "").replace(" ","").replace("[CLS]", "").replace("[gMASK]", "")
         inputs = self.tokenizer(
             resp,
+            max_length=self.args.max_seq_length,
             truncation=True,
             return_tensors="pt")
         inputs.pop('token_type_ids')
@@ -103,10 +105,11 @@ class TrainDatasetGLM(Dataset):
     def __getitem__(self, item) -> [List[BatchEncoding], List[int]]:
         group = self.nlp_dataset[item]['text'].split('\t')
         item = self.create_one_example(group[0])
-        if len(item['input_ids']) > self.args.max_seq_length:
-            return self.__getitem__(random.randint(0, self.total_len))
+        self.max_input_len = max(self.max_input_len, len(item['input_ids']))
+        # if len(item['input_ids']) > self.args.max_seq_length:
+        #     return self.__getitem__(random.randint(0, self.total_len))
         if len(group) > 1:
-            item['label'] = int(group[1])
+            item['label'] = int(float(group[1]))
         return item
 
 

@@ -18,8 +18,17 @@ def convert_model():
     new_model_dict = {k.replace('hf_model.', ''): v for k, v in model_dict.items()}
     torch.save(new_model_dict, os.path.join(RM_model_path, 'model.pt'))
 
+def covert_onnx():
+    from onnx import load_model, save_model
+    import torch
+    import torch.nn as nn
+    from onnxmltools.utils import float16_converter
+    import numpy as np
+    path = sys.argv[1]
+    out = sys.argv[2]
+    onnx_model = load_model(path + '/model.onnx')
+    new_onnx_model = float16_converter.convert_float_to_float16(onnx_model, keep_io_types=True)
+    save_model(new_onnx_model, out + '/model_fp16.onnx')
+
 if __name__ == "__main__":
-    RM_model_path = "/search/ai/kaitongyang/RLHF_DEBUG/PPO_trl/glm_0.5/"
-    model_dict = torch.load(os.path.join(RM_model_path, 'pytorch_model.bin'), map_location="cpu")
-    new_model_dict = {k: torch.zeros_like(v, dtype=v.dtype) for k, v in model_dict.items()}
-    torch.save(new_model_dict, os.path.join("./", 'model.pt'))
+    covert_onnx()
