@@ -139,17 +139,21 @@ def read_set():
             print(items[0], prompt2res[items[0]], rsp, sep='\t')
 
 def prepare_train():
-    ins = pd.read_csv(sys.argv[1])
-    for v in ins.values:
-        if v[2] == -1:
-            continue
-        if v[2] != 0 and v[2] != 1:
-            print(v[2], file=sys.stderr)
-            continue
-        outs = v[0] + '[UNUSED1]' + v[1].replace('\n', '<n>')
+    import os
+    for root, dirs, files in os.walk('./sec_reward/'):
+        for file in files:
+            if file.endswith('csv'):
+                ins = pd.read_csv(root + '/' + file)
+                for v in ins.values:
+                    if v[2] == -1:
+                        continue
+                    if v[2] != 0 and v[2] != 1:
+                        print(v[2], file=sys.stderr)
+                        continue
+                    outs = v[0] + '[UNUSED1]' + v[1].replace('\n', '<n>')
 
-        print(outs.replace('\t', ''), int(v[2]), sep='\t')
+                    print(outs.replace('\t', ''), int(v[2]), sep='\t')
 
 if __name__ == "__main__":
-    check_rsp2()
+    prepare_train()
 
