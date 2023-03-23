@@ -138,22 +138,27 @@ class TrainDatasetCPT(Dataset):
     def create_one_example(self, resp):
         resp = resp.replace("<|startofpiece|>", "").replace("<|endofpiece|>", "").replace("<|endoftext|>", "").replace(" ","").replace("[CLS]", "").replace("[gMASK]", "")
         prompt, resp = resp.split("[UNUSED1]")
+        # resp = resp.replace("[UNUSED1]", "[SEP]")
         inputs = self.tokenizer(
             prompt,
             resp,
             max_length=self.args.max_seq_length,
-            truncation=True,
             return_tensors="pt")
-        # inputs.pop('token_type_ids')
+        inputs.pop('token_type_ids')
         return {k: v.squeeze(0) for k, v in inputs.items()}
 
 
     def __getitem__(self, item) -> [List[BatchEncoding], List[int]]:
         group = self.nlp_dataset[item]['text'].split('\t')
+
         item = self.create_one_example(group[0])
         self.max_input_len = max(self.max_input_len, len(item['input_ids']))
-        # if len(item['input_ids']) > self.args.max_seq_length:
-        #     return self.__getitem__(random.randint(0, self.total_len))
+        item['input_ids'][-1] = 101
+        # ids = item['input_ids'].tolist()
+        # print(ids)
+        # exit(-1)
+        # if ids.count(self.tokenizer.eos_token_id) != 2:
+        #     return self.__getitem__(random.randint(0, self.total_len-1))
         if len(group) > 1:
             item['label'] = int(float(group[1]))
         return item

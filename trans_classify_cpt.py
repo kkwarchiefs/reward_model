@@ -22,13 +22,13 @@ import os
 import random
 import sys
 from arguments import DataTrainingArguments, ModelArguments
-from data import TrainDatasetTask, GroupCollator, TrainDatasetGLM
+from data import TrainDatasetTask, GroupCollator, TrainDatasetGLM, TrainDatasetCPT
 import datasets
 import evaluate
 import numpy as np
 from datasets import load_dataset
 import torch
-
+from torch.utils.data import Subset
 import transformers
 from transformers import (
     AutoConfig,
@@ -45,8 +45,8 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
-
-
+os.environ["WANDB_DISABLED"] = "true"
+transformers.logging.set_verbosity_error()
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 # check_min_version("4.27.0.dev0")
 
@@ -55,7 +55,8 @@ require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/text
 logger = logging.getLogger(__name__)
 
 
-
+from modeling_cpt import CPTForSequenceClassification, CPTForQuestionAnswering
+from transformers import BertTokenizer
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -128,7 +129,8 @@ def main():
         trust_remote_code=True
     )
     config.classifier_dropout = 0.1
-    tokenizer = AutoTokenizer.from_pretrained(
+    config.cls_mode = 3
+    tokenizer = BertTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
         do_lower_case=model_args.do_lower_case,
         cache_dir=model_args.cache_dir,
@@ -137,7 +139,7 @@ def main():
         use_auth_token=True if model_args.use_auth_token else None,
         trust_remote_code=True
     )
-    model = AutoModelForSequenceClassification.from_pretrained(
+    model = CPTForSequenceClassification.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
@@ -248,24 +250,26 @@ def main():
     # Prediction
     if training_args.do_predict:
         logger.info("*** Predict ***")
-        predictions, labels, metrics = trainer.predict(predict_dataset, metric_key_prefix="predict")
-        max_predict_samples = (
-            data_args.max_predict_samples if data_args.max_predict_samples is not None else len(predict_dataset)
-        )
-        metrics["predict_samples"] = min(max_predict_samples, len(predict_dataset))
-
-        trainer.log_metrics("predict", metrics)
-        trainer.save_metrics("predict", metrics)
-        print("Predict", predictions[0])
-        print("train max length: ", train_dataset.max_input_len)
-        prediction_idx = np.argmax(predictions[0], axis=1)
+        # trainer.log_metrics("predict", metrics)
+        # trainer.save_metrics("predict", metrics)
         output_predict_file = os.path.join(training_args.output_dir, "predictions.txt")
+        texts = open(data_args.pred_path[0]).readlines()
         if trainer.is_world_process_zero():
             with open(output_predict_file, "w") as writer:
-                for index, tups in enumerate(zip(open(data_args.pred_path[0]), prediction_idx, predictions[0])):
-                    # item = label_list[item]
-                    tmp = softmax(tups[2])
-                    writer.write(f"{tups[0].strip()}\t{index}\t{tups[1]}\t{tmp[tups[1]]}\n")
+                step = len(predict_dataset) // 100
+                for i in range(step):
+                    predictions, labels, metrics = trainer.predict(Subset(predict_dataset, range(i*100, (i+1)*100)), metric_key_prefix="predict")
+                    max_predict_samples = (
+                        data_args.max_predict_samples if data_args.max_predict_samples is not None else len(predict_dataset)
+                    )
+                    metrics["predict_samples"] = min(max_predict_samples, len(predict_dataset))
+                    print("Predict", predictions[0])
+                    # print("train max length: ", train_dataset.max_input_len)
+                    prediction_idx = np.argmax(predictions[0], axis=1)
+                    for index, tups in enumerate(zip(texts[i*100: (i+1)*100], prediction_idx, predictions[0])):
+                        # item = label_list[item]
+                        tmp = softmax(tups[2])
+                        writer.write(f"{tups[0].strip()}\t{tups[1]}\t{tmp[tups[1]]}\n")
 
 def softmax(x):
     return(np.exp(x)/np.exp(x).sum())

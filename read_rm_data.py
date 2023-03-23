@@ -155,5 +155,5 @@ def prepare_train():
                     print(outs.replace('\t', ''), int(v[2]), sep='\t')
 
 if __name__ == "__main__":
-    prepare_train()
+    check_rsp2()
 
