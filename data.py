@@ -153,7 +153,7 @@ class TrainDatasetCPT(Dataset):
 
         item = self.create_one_example(group[0])
         self.max_input_len = max(self.max_input_len, len(item['input_ids']))
-        item['input_ids'][-1] = 101
+        # item['input_ids'][-1] = 101
         # ids = item['input_ids'].tolist()
         # print(ids)
         # exit(-1)

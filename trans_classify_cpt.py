@@ -248,28 +248,50 @@ def main():
         trainer.save_metrics("eval", metrics)
 
     # Prediction
+    # if training_args.do_predict:
+    #     logger.info("*** Predict ***")
+    #     # trainer.log_metrics("predict", metrics)
+    #     # trainer.save_metrics("predict", metrics)
+    #     output_predict_file = os.path.join(training_args.output_dir, "predictions.txt")
+    #     texts = open(data_args.pred_path[0]).readlines()
+    #     if trainer.is_world_process_zero():
+    #         with open(output_predict_file, "w") as writer:
+    #             step = len(predict_dataset) // 100
+    #             for i in range(step):
+    #                 predictions, labels, metrics = trainer.predict(Subset(predict_dataset, range(i*100, (i+1)*100)), metric_key_prefix="predict")
+    #                 max_predict_samples = (
+    #                     data_args.max_predict_samples if data_args.max_predict_samples is not None else len(predict_dataset)
+    #                 )
+    #                 metrics["predict_samples"] = min(max_predict_samples, len(predict_dataset))
+    #                 print("Predict", predictions[0])
+    #                 # print("train max length: ", train_dataset.max_input_len)
+    #                 prediction_idx = np.argmax(predictions[0], axis=1)
+    #                 for index, tups in enumerate(zip(texts[i*100: (i+1)*100], prediction_idx, predictions[0])):
+    #                     # item = label_list[item]
+    #                     tmp = softmax(tups[2])
+    #                     writer.write(f"{tups[0].strip()}\t{tups[1]}\t{tmp[tups[1]]}\n")
+    # Prediction
     if training_args.do_predict:
         logger.info("*** Predict ***")
-        # trainer.log_metrics("predict", metrics)
-        # trainer.save_metrics("predict", metrics)
+        predictions, labels, metrics = trainer.predict(predict_dataset, metric_key_prefix="predict")
+        max_predict_samples = (
+            data_args.max_predict_samples if data_args.max_predict_samples is not None else len(predict_dataset)
+        )
+        metrics["predict_samples"] = min(max_predict_samples, len(predict_dataset))
+
+        trainer.log_metrics("predict", metrics)
+        trainer.save_metrics("predict", metrics)
+        print("Predict", predictions[0])
+        print("train max length: ", train_dataset.max_input_len)
+        prediction_idx = np.argmax(predictions[0], axis=1)
         output_predict_file = os.path.join(training_args.output_dir, "predictions.txt")
-        texts = open(data_args.pred_path[0]).readlines()
         if trainer.is_world_process_zero():
             with open(output_predict_file, "w") as writer:
-                step = len(predict_dataset) // 100
-                for i in range(step):
-                    predictions, labels, metrics = trainer.predict(Subset(predict_dataset, range(i*100, (i+1)*100)), metric_key_prefix="predict")
-                    max_predict_samples = (
-                        data_args.max_predict_samples if data_args.max_predict_samples is not None else len(predict_dataset)
-                    )
-                    metrics["predict_samples"] = min(max_predict_samples, len(predict_dataset))
-                    print("Predict", predictions[0])
-                    # print("train max length: ", train_dataset.max_input_len)
-                    prediction_idx = np.argmax(predictions[0], axis=1)
-                    for index, tups in enumerate(zip(texts[i*100: (i+1)*100], prediction_idx, predictions[0])):
-                        # item = label_list[item]
-                        tmp = softmax(tups[2])
-                        writer.write(f"{tups[0].strip()}\t{tups[1]}\t{tmp[tups[1]]}\n")
+                for index, tups in enumerate(zip(open(data_args.pred_path[0]), prediction_idx, predictions[0])):
+                    # item = label_list[item]
+                    tmp = softmax(tups[2])
+                    writer.write(f"{tups[0].strip()}\t{index}\t{tups[1]}\t{tmp[tups[1]]}\n")
+
 
 def softmax(x):
     return(np.exp(x)/np.exp(x).sum())

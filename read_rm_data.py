@@ -119,24 +119,24 @@ def check_rsp2():
 
 def read_set():
     prompt2res = {}
-    for prompt, rsp in zip(open('./reward_data/top_5000_25000.csv'), open('./reward_data/toolgpt_0.6_5000_25000.txt')):
+    for prompt, rsp in zip(open('./top_5000_25000.csv'), open('./toolgpt_0.6_5000_25000.txt')):
         prompt = prompt.strip()
         rsp = rsp.strip()
         if '<n>' in prompt:
             prompt = '"' + prompt.replace('<n>', "\n").replace('"', "'") + '"'
-        # if rsp.count('<n>') > 5:
-        #     continue
+        if rsp.count('<n>') < 5:
+            continue
         if '<n>' in rsp:
             rsp = '"' + rsp.replace('<n>', "\n").replace('"', "'") + '"'
-        prompt2res[prompt] = rsp.replace('<|startofpiece|>', '')
-        # print(prompt, rsp.replace('<|startofpiece|>', ''), sep='\t')
-    for line in sys.stdin:
-        items = line.strip().split('\t')
-        rsp = items[1]
-        if items[0] in prompt2res:
-            if '<n>' in rsp:
-                rsp = '"' + rsp.replace('<n>', "\n").replace('"', "'") + '"'
-            print(items[0], prompt2res[items[0]], rsp, sep='\t')
+        # prompt2res[prompt] = rsp.replace('<|startofpiece|>', '')
+        print(prompt, rsp.replace('<|startofpiece|>', ''), sep='\t')
+    # for line in sys.stdin:
+    #     items = line.strip().split('\t')
+    #     rsp = items[1]
+    #     if items[0] in prompt2res:
+    #         if '<n>' in rsp:
+    #             rsp = '"' + rsp.replace('<n>', "\n").replace('"', "'") + '"'
+    #         print(items[0], prompt2res[items[0]], rsp, sep='\t')
 
 def prepare_train():
     import os
@@ -153,7 +153,20 @@ def prepare_train():
                     outs = v[0] + '[UNUSED1]' + v[1].replace('\n', '<n>')
 
                     print(outs.replace('\t', ''), int(v[2]), sep='\t')
+def prepare_train2():
+    ins = pd.read_csv(sys.argv[1])
+    for v in ins.values:
+        if v[2] == -1:
+            continue
+        if v[2] != 0 and v[2] != 1:
+            print(v[2], file=sys.stderr)
+            continue
+        rsp = v[1].strip().strip('"')
+        outs = v[0] + '[UNUSED1]' + rsp.replace('\n', '<n>')
+
+        print(outs.replace('\t', ''), int(v[2]), sep='\t')
+
 
 if __name__ == "__main__":
-    check_rsp2()
+    prepare_train2()
 

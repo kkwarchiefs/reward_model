@@ -60,17 +60,17 @@ python3 -m torch.distributed.launch --nproc_per_node 4 trans_classify_cpt.py \
   --dev_path datas/resp_second/dev.tsv \
   --per_device_train_batch_size 3 \
   --learning_rate 2e-6 \
-  --num_train_epochs 4.0 \
+  --num_train_epochs 3.0 \
   --max_seq_length 1024 \
   --evaluation_strategy epoch \
-  --output_dir output/resp_format_third \
+  --output_dir output/resp_format_4th \
   --overwrite_output_dir \
   --save_steps -1
 
 python3 -m torch.distributed.launch --nproc_per_node 1 trans_classify_cpt.py \
   --model_name_or_path output/resp_format_third \
   --do_predict \
-  --pred_path datas/resp_second/train.tsv \
+  --pred_path datas/resp_second/pred.tsv \
   --per_device_train_batch_size 2 \
   --per_device_eval_batch_size 3 \
   --output_dir output/multi_tasks3 \
