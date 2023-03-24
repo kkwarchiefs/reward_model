@@ -136,11 +136,11 @@ class TrainDatasetCPT(Dataset):
         return self.total_len
 
     def create_one_example(self, resp):
-        resp = resp.replace("<|startofpiece|>", "").replace("<|endofpiece|>", "").replace("<|endoftext|>", "").replace(" ","").replace("[CLS]", "").replace("[gMASK]", "")
-        prompt, resp = resp.split("[UNUSED1]")
-        # resp = resp.replace("[UNUSED1]", "[SEP]")
+        resp = resp
+        # prompt, resp = resp.split("[UNUSED1]")
+        resp = resp.replace("[UNUSED1]", "[SEP]")
         inputs = self.tokenizer(
-            prompt,
+            # prompt,
             resp,
             max_length=self.args.max_seq_length,
             return_tensors="pt")

@@ -140,19 +140,19 @@ def read_set():
 
 def prepare_train():
     import os
-    for root, dirs, files in os.walk('./sec_reward/'):
+    for root, dirs, files in os.walk('./third_model/'):
         for file in files:
             if file.endswith('csv'):
                 ins = pd.read_csv(root + '/' + file)
-                for v in ins.values:
-                    if v[2] == -1:
-                        continue
-                    if v[2] != 0 and v[2] != 1:
-                        print(v[2], file=sys.stderr)
-                        continue
+                for idx, v in enumerate(ins.values):
+                    # if v[2] == -1:
+                    #     continue
+                    # if v[2] != 0 and v[2] != 1:
+                    #     print(idx, v[2], file=sys.stderr)
+                    #     continue
                     outs = v[0] + '[UNUSED1]' + v[1].replace('\n', '<n>')
+                    print(outs.replace('\t', ''), 0, sep='\t')
 
-                    print(outs.replace('\t', ''), int(v[2]), sep='\t')
 def prepare_train2():
     ins = pd.read_csv(sys.argv[1])
     for v in ins.values:
@@ -161,11 +161,35 @@ def prepare_train2():
         if v[2] != 0 and v[2] != 1:
             print(v[2], file=sys.stderr)
             continue
-        rsp = v[1].strip().strip('"')
+        rsp = v[1].strip().strip('"').replace("<|endoftext|>", "")
         outs = v[0] + '[UNUSED1]' + rsp.replace('\n', '<n>')
 
         print(outs.replace('\t', ''), int(v[2]), sep='\t')
 
+def chat_format():
+    for line in sys.stdin:
+        ins = json.loads(line)
+        rsp = ins["response"]
+        if '\n' in ins["response"]:
+            rsp = '"' + rsp.replace('"', "'") + '"'
+        print(ins["prompt"], rsp, sep='\t')
+
+def read_user_sec():
+    # ins = pd.read_csv(sys.argv[1])
+    name2res = defaultdict(list)
+    for line in open(sys.argv[1]):
+        v = line.strip().split('\t')
+        name2res[v[0]].append([v[1], json.loads(v[2])])
+    for k, v in name2res.items():
+        for pair in v:
+            res = []
+            for p in pair[1]:
+                res.append((p['name'], p['level']))
+            res.sort(key=lambda x: x[1], reverse=True)
+            rsp = res[-1][0]
+            if '\n' in rsp:
+                rsp = '"' + rsp.replace('"', "'") + '"'
+            print(k, rsp, sep='\t')
 
 if __name__ == "__main__":
     prepare_train2()

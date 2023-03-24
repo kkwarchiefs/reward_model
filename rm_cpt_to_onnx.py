@@ -14,7 +14,7 @@ parser.add_argument("--device", type=int, default=0)
 args = parser.parse_args()
 
 model_name = "RM_cpt_onnx"
-device = torch.device('cuda:7')
+device = torch.device('cuda:0')
 
 
 RM_model_path = "/search/ai/kaitongyang/RLHF_DEBUG/RM/summarization_reward_model/checkpoint-58/"
@@ -24,6 +24,7 @@ RM_model_path = "/search/ai/kaitongyang/RLHF_DEBUG/RM/reward_model_glm_10b/check
 RM_model_path = "./output/rm_model/"
 RM_model_path = "/search/ai/kaitongyang/RLHF_DEBUG/RM/reward_model_glm_10b/checkpoint-3439"
 RM_model_path = "/search/ai/jamsluo/GLM_RLHF/reward_model/output/resp_format_4th"
+RM_model_path = "/search/ai/jamsluo/GLM_RLHF/reward_model/output/resp_format_0324"
 
 RM_tokenizer = BertTokenizer.from_pretrained(RM_model_path, trust_remote_code=True)
 config = AutoConfig.from_pretrained(
@@ -39,9 +40,9 @@ RM_model = CPTForSequenceClassification.from_pretrained(RM_model_path, config=co
 # load_result = RM_model.load_state_dict(new_model_dict, strict=True)
 
 RM_model = RM_model.half().to(device)
-query_text = '什么人不能喝三七粉'
+query_text = '什么人不能喝三七粉[SEP]'
 response_text = '服用三七粉期间,孕妇和儿童不宜使用。 三七粉是处方药,不是药品。 过量服用会引起中毒。'
-input = RM_tokenizer(query_text, response_text, max_length=1024, truncation=True, return_tensors="pt").to(device)
+input = RM_tokenizer(query_text + response_text, max_length=1024, truncation=True, return_tensors="pt").to(device)
 print(input)
 # print(RM_model(input['input_ids'], input['attention_mask']))
 RM_model = RM_model.eval()  # 转换为eval模式

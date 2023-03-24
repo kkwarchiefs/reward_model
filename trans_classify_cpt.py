@@ -257,7 +257,7 @@ def main():
     #     if trainer.is_world_process_zero():
     #         with open(output_predict_file, "w") as writer:
     #             step = len(predict_dataset) // 100
-    #             for i in range(step):
+    #             for i in range(step+1):
     #                 predictions, labels, metrics = trainer.predict(Subset(predict_dataset, range(i*100, (i+1)*100)), metric_key_prefix="predict")
     #                 max_predict_samples = (
     #                     data_args.max_predict_samples if data_args.max_predict_samples is not None else len(predict_dataset)
@@ -282,7 +282,7 @@ def main():
         trainer.log_metrics("predict", metrics)
         trainer.save_metrics("predict", metrics)
         print("Predict", predictions[0])
-        print("train max length: ", train_dataset.max_input_len)
+        # print("train max length: ", train_dataset.max_input_len)
         prediction_idx = np.argmax(predictions[0], axis=1)
         output_predict_file = os.path.join(training_args.output_dir, "predictions.txt")
         if trainer.is_world_process_zero():
