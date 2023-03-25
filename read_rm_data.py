@@ -155,16 +155,27 @@ def prepare_train():
 
 def prepare_train2():
     ins = pd.read_csv(sys.argv[1])
-    for v in ins.values:
+    for idx, v in enumerate(ins.values):
         if v[2] == -1:
             continue
         if v[2] != 0 and v[2] != 1:
-            print(v[2], file=sys.stderr)
+            print(idx, v[2], file=sys.stderr)
             continue
         rsp = v[1].strip().strip('"').replace("<|endoftext|>", "")
         outs = v[0] + '[UNUSED1]' + rsp.replace('\n', '<n>')
 
         print(outs.replace('\t', ''), int(v[2]), sep='\t')
+
+def prepare_train3():
+    ins = pd.read_csv(sys.argv[1])
+    for v in ins.values:
+        prompt = v[0].replace('[CLS]', '').replace('<|startofpiece|>', '').replace('[gMASK]', '').replace('[回答]', '').replace(' ', '')
+        out_res = []
+        for rsp in v[1:]:
+            rsp = rsp.strip().strip('"').replace("<|endoftext|>", "").replace("<|endofpiece|>", '')
+            outs = prompt + '[UNUSED1]' + rsp.replace('\n', '<n>')
+            out_res.append(outs.replace('\t', ' '))
+        print('\t'.join(out_res))
 
 def chat_format():
     for line in sys.stdin:
@@ -190,6 +201,14 @@ def read_user_sec():
             if '\n' in rsp:
                 rsp = '"' + rsp.replace('"', "'") + '"'
             print(k, rsp, sep='\t')
+
+def chat_format():
+    for line in sys.stdin:
+        line = line.strip().replace('<n>', '\n')
+        rsp = line
+        if '\n' in line:
+            rsp = '"' + rsp.replace('"', "'") + '"'
+        print(rsp, sep='\t')
 
 if __name__ == "__main__":
     prepare_train2()

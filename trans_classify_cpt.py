@@ -45,8 +45,8 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
-os.environ["WANDB_DISABLED"] = "true"
-transformers.logging.set_verbosity_error()
+# os.environ["WANDB_DISABLED"] = "true"
+# transformers.logging.set_verbosity_error()
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 # check_min_version("4.27.0.dev0")
 
@@ -68,7 +68,7 @@ def main():
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
-    send_example_telemetry("run_xnli", model_args)
+    # send_example_telemetry("run_xnli", model_args)
 
     # Setup logging
     logging.basicConfig(
@@ -211,7 +211,7 @@ def main():
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
-        compute_metrics=compute_metrics,
+        # compute_metrics=compute_metrics,
         tokenizer=tokenizer,
         data_collator=GroupCollator(tokenizer),
     )

@@ -77,10 +77,27 @@ python3 -m torch.distributed.launch --nproc_per_node 4 trans_classify_cpt.py \
   --dev_path datas/resp_0324/dev.tsv \
   --per_device_train_batch_size 3 \
   --learning_rate 2e-6 \
+  --logging_steps 50 \
   --num_train_epochs 3.0 \
   --max_seq_length 1024 \
   --evaluation_strategy epoch \
   --output_dir output/resp_format_0324 \
+  --overwrite_output_dir \
+  --save_steps -1
+
+ python3 -m torch.distributed.launch --nproc_per_node 8 trans_classify_cpt.py \
+  --model_name_or_path /search/ai/pretrain_models/cpt-large/ \
+  --do_train \
+  --do_eval \
+  --pred_path datas/resp_0324/dev.tsv \
+  --train_path datas/resp_0324/train.tsv \
+  --dev_path datas/resp_0324/dev.tsv \
+  --per_device_train_batch_size 4 \
+  --learning_rate 2e-6 \
+  --num_train_epochs 4.0 \
+  --max_seq_length 1024 \
+  --evaluation_strategy epoch \
+  --output_dir output/resp_format_0325 \
   --overwrite_output_dir \
   --save_steps -1
 

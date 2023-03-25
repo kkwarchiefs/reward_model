@@ -20,9 +20,10 @@ import pandas as pd
 path = "/search/ai/kaitongyang/RLHF_DEBUG/PPO_trl/glm_0.5"
 path = "/search/ai/jamsluo/GLM_RLHF/ppo_glm/RLHF_MODEL_new_rm_glm_fb16/2_49"
 path = "/search/ai/jamsluo/GLM_RLHF/ppo_glm/RLHF_sft06_rm_large_new/2_149/"
+path = "/search/ai/kaitongyang/ppo_glm_online/ppo_glm/ppo_model/all_data_300/0_90"
 # path = '/search/ai/pretrain_models/glm-large-chinese/'
 device = "cuda:" + sys.argv[2]
-suffix = "[回答][gMASK]"
+suffix = " [回答][gMASK]"
 
 tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
 model = AutoModelForSeq2SeqLM.from_pretrained(path, trust_remote_code=True)
@@ -34,7 +35,7 @@ def build_inputs(texts):
     inputs_ori = inputs_ori.to(device)
     for key in inputs_ori:
         inputs_ori[key] = inputs_ori[key][:, :-1]
-    inputs = tokenizer.build_inputs_for_generation(inputs_ori, max_gen_length=256)
+    inputs = tokenizer.build_inputs_for_generation(inputs_ori, max_gen_length=512)
     return inputs
 
 def generation_template(inputs, max_length, top_k, top_p, do_sample, temperature):
@@ -61,10 +62,11 @@ def generate_form():
     ins = pandas.read_csv('./classify_rm/prompt_format.csv')
     print(ins)
 if __name__ == "__main__":
-    generate_form()
-    # for line in open(sys.argv[1]):
-    #     prompt = line.strip()
-    #     inputs = build_inputs(prompt)
+    # generation_template()
+    for line in open(sys.argv[1]):
+        prompt = line.replace('[CLS]', '').replace('<|startofpiece|>', '').replace('[gMASK]', '').replace('[回答]', '').replace(' ', '')
+        inputs = build_inputs(prompt)
+        print(prompt, generation_template(inputs, max_length=128, top_k=0, top_p=1.0, do_sample=True, temperature=0.3),sep='\t')
     #     try:
     #         print(prompt, generation_template(inputs, max_length=512, top_k=0, top_p=1.0, do_sample=True, temperature=1), sep='\t')
     #     except:
