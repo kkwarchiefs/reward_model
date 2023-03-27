@@ -24,7 +24,7 @@ RM_model_path = "/search/ai/kaitongyang/RLHF_DEBUG/RM/reward_model_glm_10b/check
 RM_model_path = "./output/rm_model/"
 RM_model_path = "/search/ai/kaitongyang/RLHF_DEBUG/RM/reward_model_glm_10b/checkpoint-3439"
 RM_model_path = "/search/ai/jamsluo/GLM_RLHF/reward_model/output/resp_format_4th"
-RM_model_path = "/search/ai/jamsluo/GLM_RLHF/reward_model/output/resp_format_0325"
+RM_model_path = "/search/ai/jamsluo/GLM_RLHF/reward_model/output/resp_format_0326"
 
 RM_tokenizer = BertTokenizer.from_pretrained(RM_model_path, trust_remote_code=True)
 config = AutoConfig.from_pretrained(
