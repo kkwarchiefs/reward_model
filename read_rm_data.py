@@ -202,7 +202,7 @@ def read_user_sec():
                 rsp = '"' + rsp.replace('"', "'") + '"'
             print(k, rsp, sep='\t')
 
-def chat_format():
+def chat_format2():
     for line in sys.stdin:
         line = line.strip().replace('<n>', '\n')
         rsp = line
@@ -210,6 +210,24 @@ def chat_format():
             rsp = '"' + rsp.replace('"', "'") + '"'
         print(rsp, sep='\t')
 
+def chat_format3():
+    for line in sys.stdin:
+        line = line.strip().replace('<n>', '\n')
+        items = line.split('\t')
+        newitem = []
+        for item in items:
+            if '\n' in item:
+                newitem.append('"' + item.replace('"', "'") + '"')
+            else:
+                newitem.append(item)
+        print('\t'.join(newitem), sep='\t')
+
+def chat_rm_score():
+    for line in sys.stdin:
+        ins = json.loads(line)
+        rsp = ins["response"]
+        print(ins["prompt"].replace('\n', '<n>'), rsp.replace('\n', '<n>'), sep='\t')
+
 if __name__ == "__main__":
-    prepare_train2()
+    chat_format3()
 
