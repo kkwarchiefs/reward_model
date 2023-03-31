@@ -228,6 +228,17 @@ def chat_rm_score():
         rsp = ins["response"]
         print(ins["prompt"].replace('\n', '<n>'), rsp.replace('\n', '<n>'), sep='\t')
 
+def chat_format_class():
+    for line in sys.stdin:
+        ins = json.loads(line)
+        rsp = ins["response"]
+        prompt = ins["prompt"]
+        if '\n' in ins["response"]:
+            rsp = '"' + rsp.replace('"', "'") + '"'
+        if "生成类" not in prompt and "信息抽取类" not in prompt:
+            continue
+        print(prompt, rsp, sep='\t')
+
 if __name__ == "__main__":
-    chat_format3()
+    chat_format_class()
 
