@@ -1,0 +1,52 @@
+<body>
+    <file>文档名称</file>
+    <title>正文标题</title>
+    <h1 name="一级目录名称">
+        <p>文章没有目录结构的，就直接按照#p 输出正文</p>
+        <p>原文的正文段落内容，如果有加粗、删除 或者 引用需要加入对应的标签，其余均直接输出纯文本就好，如下例：</p>
+        <p>原文中内容加粗，则<b>加粗内容</b>的内容；原文中的删除线内容，则<del>删除线的内容</del> ；原文中超链接，则
+            <a
+                    href="https://www.qq.com/">正文中跳转的内容
+            </a>
+        </p>
+        <p>其他类型的强调都转成加粗就行</p>
+        <p>正文中的换行br、隐藏等其他类型都删除</p>
+        <p>当前将全部正文信息当前一个div进行处理，不同的分节需要合并处理</p>
+        <p>引用类型也不再需要，转成正文文本就行</p>
+    </h1>
+    <h1 name="一级目录名称">
+        <p>目录按照2-3-4这样顺序排序，不要出现跳目录的情况</p>
+        <p>目录之间按照包含嵌套的方式进行，不要一级目录和二级</p>
+        <h2 name="二级目录名称">
+            <h3 name="三级目录名称">
+                <p>最终节点</p>
+            </h3>
+        </h2>
+    </h1>
+    <h1 name="所有的列表都转换成无序列表">
+        <ul>
+            <li>Coffee</li>
+            <li>Tea</li>
+            <li>Milk</li>
+        </ul>
+    </h1>
+    <h1 name="更多详细格式要求">
+        <h2 name="代码命名同html">
+            <code>代码只需要保存到对应内容就行，其他多余的格式就不需要了 print("Hello World")</code>
+        </h2>
+        <h2 name="表格命名同html">
+            <table>
+                <caption>表格信息也保留到最基础的文本形式就行</caption>
+                <tr>
+                    <td>Link to Homework #1</td>
+                    <td>Link to Homework #2</td>
+                </tr>
+                <tr>
+                    <td>Link to Homework #3</td>
+                    <td>Link to Homework #4</td>
+                </tr>
+            </table>
+        </h2>
+    </h1>
+</body>
+

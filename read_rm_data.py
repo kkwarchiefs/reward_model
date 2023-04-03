@@ -235,7 +235,7 @@ def chat_format_class():
         prompt = ins["prompt"]
         if '\n' in ins["response"]:
             rsp = '"' + rsp.replace('"', "'") + '"'
-        if "生成类" not in prompt and "信息抽取类" not in prompt:
+        if "头脑风暴类" not in prompt and "open-domain" not in prompt:
             continue
         print(prompt, rsp, sep='\t')
 
