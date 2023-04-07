@@ -16,11 +16,9 @@ if __name__ == "__main__":
     import xml.dom.minidom
 
     # 使用minidom解析器打开XML文档
-    DOMTree = xml.dom.minidom.parse("./data/data_type.xml")
+    DOMTree = xml.dom.minidom.parse("./data/dump_extract_text_tree.xml")
     Data = DOMTree.documentElement
-    if Data.hasAttribute("name"):
+    if Data.hasAttribute("h1"):
         print("name element : %s" % Data.getAttribute("name"))
 
-        # 在集合中获取所有国家
-    Countrys = Data.getElementsByTagName("country")
 
