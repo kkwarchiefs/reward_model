@@ -353,3 +353,16 @@ CUDA_VISIBLE_DEVICES=0  python3 rewar.py \
   --output_dir output/tmp \
   --overwrite_output_dir \
   --save_steps -1
+
+
+python3 run_qa.py \
+  --model_name_or_path /search/ai/pretrain_models/infoxlm-base/ \
+  --dataset_name data/quad.py \
+  --do_train \
+  --do_eval \
+  --per_device_train_batch_size 12 \
+  --learning_rate 3e-5 \
+  --num_train_epochs 2 \
+  --max_seq_length 512 \
+  --doc_stride 128 \
+  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/multi_qa

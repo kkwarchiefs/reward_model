@@ -9,7 +9,7 @@ import numpy as np
 import tritonclient.http as httpclient
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from modeling_cpt import CPTForSequenceClassification, CPTForQuestionAnswering
-from transformers import BertTokenizer
+from transformers import BertTokenizer, BertForQuestionAnswering
 model_name = "REL_model_onnx"  # 模型目录名/venus注册模型名称
 address = "10.212.207.33:12356"  # 机器地址
 import json
