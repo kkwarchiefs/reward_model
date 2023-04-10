@@ -46,13 +46,14 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
-
+import time
+import json
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
-check_min_version("4.28.0.dev0")
+# check_min_version("4.28.0.dev0")
 
 require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/question-answering/requirements.txt")
-
+os.environ["WANDB_DISABLED"] = "true"
 logger = logging.getLogger(__name__)
 
 
@@ -596,6 +597,8 @@ def main():
             formatted_predictions = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
 
         references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in examples]
+        timestr = str(int(time.time()))
+        json.dump([formatted_predictions, references], open(training_args.output_dir + '/' + timestr + '_predictions.json', 'w'))
         return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
     metric = evaluate.load("squad_v2" if data_args.version_2_with_negative else "squad")

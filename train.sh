@@ -159,7 +159,6 @@ deepspeed --num_gpus=4 reward_rank.py \
   --num_train_epochs 6.0 \
   --max_seq_length 512 \
   --evaluation_strategy steps \
-  --eval_steps 30 \
   --output_dir output/rm_model \
   --overwrite_output_dir \
   --save_steps -1 \
@@ -355,14 +354,18 @@ CUDA_VISIBLE_DEVICES=0  python3 rewar.py \
   --save_steps -1
 
 
-python3 run_qa.py \
+python3 -m torch.distributed.launch --nproc_per_node 8 multi_qa.py \
   --model_name_or_path /search/ai/pretrain_models/infoxlm-base/ \
-  --dataset_name data/quad.py \
+  --dataset_name squad.py \
   --do_train \
   --do_eval \
-  --per_device_train_batch_size 12 \
+  --per_device_train_batch_size 80 \
+  --logging_steps 20 \
   --learning_rate 3e-5 \
-  --num_train_epochs 2 \
-  --max_seq_length 512 \
+  --num_train_epochs 10 \
+  --max_seq_length 384  \
   --doc_stride 128 \
-  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/multi_qa
+  --overwrite_output_dir \
+  --version_2_with_negative \
+  --evaluation_strategy epoch \
+  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/multi_qa_v2

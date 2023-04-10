@@ -18,7 +18,7 @@
 
 
 import json
-
+import random
 import datasets
 from datasets.tasks import QuestionAnsweringExtractive
 
@@ -63,7 +63,11 @@ class SquadConfig(datasets.BuilderConfig):
           **kwargs: keyword arguments forwarded to super.
         """
         super(SquadConfig, self).__init__(**kwargs)
-
+import hashlib
+def get_md5(sign):
+    instance = hashlib.md5()
+    instance.update(sign.encode("utf-8"))
+    return instance.hexdigest()
 
 class Squad(datasets.GeneratorBasedBuilder):
     """SQUAD: The Stanford Question Answering Dataset. Version 1.1."""
@@ -71,7 +75,7 @@ class Squad(datasets.GeneratorBasedBuilder):
     BUILDER_CONFIGS = [
         SquadConfig(
             name="plain_text",
-            version=datasets.Version("1.0.0", ""),
+            version=datasets.Version("1.0.1", ""),
             description="Plain text",
         ),
     ]
@@ -109,8 +113,10 @@ class Squad(datasets.GeneratorBasedBuilder):
         # downloaded_files = dl_manager.download_and_extract(_URLS)
 
         return [
-            datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/qa_data/train.json'}),
-            datasets.SplitGenerator(name=datasets.Split.VALIDATION, gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/qa_data/dev.json'}),
+            datasets.SplitGenerator(name=datasets.Split.TRAIN,
+                                    gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/qa_data/train_multi.json'}),
+            datasets.SplitGenerator(name=datasets.Split.VALIDATION,
+                                    gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/qa_data/dev_multi.json'}),
         ]
 
     def _generate_examples(self, filepath):
@@ -122,6 +128,9 @@ class Squad(datasets.GeneratorBasedBuilder):
             squad = json.load(f)
             for article in squad["data"]:
                 title = article.get("title", "")
+                suffix = ''
+                if 'type' in article:
+                    suffix = article['type']
                 for paragraph in article["paragraphs"]:
                     context = paragraph["context"]  # do not strip leading blank spaces GH-2585
                     for qa in paragraph["qas"]:
@@ -133,7 +142,7 @@ class Squad(datasets.GeneratorBasedBuilder):
                             "title": title,
                             "context": context,
                             "question": qa["question"],
-                            "id": qa["id"],
+                            "id": qa["id"] + suffix,
                             "answers": {
                                 "answer_start": answer_starts,
                                 "text": answers,
