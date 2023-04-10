@@ -597,8 +597,6 @@ def main():
             formatted_predictions = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
 
         references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in examples]
-        timestr = str(int(time.time()))
-        json.dump([formatted_predictions, references], open(training_args.output_dir + '/' + timestr + '_predictions.json', 'w'))
         return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
     metric = evaluate.load("squad_v2" if data_args.version_2_with_negative else "squad")
