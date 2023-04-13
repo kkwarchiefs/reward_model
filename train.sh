@@ -370,18 +370,36 @@ python3 -m torch.distributed.launch --nproc_per_node 8 multi_qa.py \
   --evaluation_strategy epoch \
   --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/multi_qa_v2
 
+
 python3 -m torch.distributed.launch --nproc_per_node 8 multi_qa.py \
-  --model_name_or_path /search/ai/pretrain_models/ernie-m-base/ \
+  --model_name_or_path /search/ai/pretrain_models/infoxlm-base/ \
   --dataset_name squad.py \
+  --do_train \
+  --do_eval \
+  --per_device_train_batch_size 60 \
+  --logging_steps 20 \
+  --learning_rate 3e-5 \
+  --num_train_epochs 10 \
+  --max_seq_length 512  \
+  --doc_stride 256 \
+  --overwrite_output_dir \
+  --version_2_with_negative \
+  --evaluation_strategy epoch \
+  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/squad_cmrc
+
+
+python3 -m torch.distributed.launch --nproc_per_node 8 multi_qa.py \
+  --model_name_or_path /search/ai/pretrain_models/infoxlm-base/ \
+  --dataset_name squad_zh_en.py \
   --do_train \
   --do_eval \
   --per_device_train_batch_size 80 \
   --logging_steps 20 \
   --learning_rate 3e-5 \
   --num_train_epochs 10 \
-  --max_seq_length 384  \
-  --doc_stride 128 \
+  --max_seq_length 512  \
+  --doc_stride 256 \
   --overwrite_output_dir \
   --version_2_with_negative \
   --evaluation_strategy epoch \
-  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/multi_qa_ernie_base
+  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/squad_cmrc_du

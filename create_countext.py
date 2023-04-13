@@ -269,13 +269,14 @@ class SearchContext():
         return results
 
     def get_doc_embedding_index(self, text):
-        inputs = self.cut_doc(text, piece_len=500)
+        inputs = SearchContext.cut_doc(text, piece_len=500)
         emb = self.get_embedding(inputs)
         self.doc_piece_emb_index = faiss.IndexFlatL2(emb.shape[1])
         self.doc_piece_emb_index.add(emb)
         return inputs
 
-    def cut_doc(self, data, piece_len=750, single_piece_max_len=1700):
+    @staticmethod
+    def cut_doc(data, piece_len=750, single_piece_max_len=1700):
         if len(data)<single_piece_max_len:
             return [data]
         piece_data = []
@@ -533,7 +534,8 @@ class QAContext():
             partlen = partlen + left_text - right_text
             newspan.append((left_text, right_text, a[2]))
         newspan = self._merge_set(newspan)
-        return newspan
+        res = [self.content[a[0]:a[1]] for a in newspan]
+        return res
 
     @staticmethod
     def find_left_idx(char2idx, idx2pair, leftid, spanlen):
@@ -563,9 +565,10 @@ class QAContext():
             partlen = partlen + token_left - token_right
             newspan.append((text_left, text_right, a[2]))
         newspan = self._merge_set(newspan)
-        return newspan
+        res = [self.content[a[0]:a[1]] for a in newspan]
+        return res
 
-    def _prepare_inputs(self, query):
+    def _do_mrc(self, query):
         if self.is_chinese:
             example_batch = {
                 "id": [str(i) for i in range(len(self.context_inputs))],
@@ -590,6 +593,9 @@ class QAContext():
             spans = [(a['offsets'][0] + start, a['offsets'][1] + start, a['score']) for a in vlist if 'offsets' in a]
             all_span += spans
         spanset = self._merge_set(all_span)
+        return spanset
+
+    def _locate_answer(self, spanset):
         if self.is_chinese:
             return self._find_parts(spanset, self.max_content_length)
         tokenized_offsets = self.tokenizer(
@@ -612,6 +618,25 @@ class QAContext():
             idx2pair[idx] = (start, end)
         return self._find_parts_idx(charid2idx, idx2pair, spanset, self.max_content_length)
 
+    def _locate_cut_content(self, spanset, topk):
+        index2maxscore = {}
+        index2res = collections.defaultdict(list)
+        for start, end, score in spanset:
+            locate = self.doc_index2_part[start]
+            index2res[locate].append((self.content[start:end], score))
+            if locate not in index2maxscore:
+                index2maxscore[locate] = score
+            else:
+                if score > index2maxscore[locate]:
+                    index2maxscore[locate] = score
+        sort_doc = sorted(index2maxscore.items(), key=lambda x:x[1], reverse=True)
+        res = []
+        for k, v in index2res.items():
+            print(self.part_doc[k], v, sep='\t')
+        for k, v in sort_doc[:topk]:
+            res.append(self.part_doc[k])
+        return res
+
     def refresh_data(self, text):
         self.content = text.replace("\n", '')
         res = langid.classify(self.content)
@@ -626,13 +651,19 @@ class QAContext():
                     self.context_inputs.append(context_parts[i] + context_parts[i + 1])
                 else:
                     self.context_inputs.append(context_parts[i])
+        # part strategy
+        self.part_doc = SearchContext.cut_doc(self.content, piece_len=500)
+        index = 0
+        self.doc_index2_part = {}
+        for idx, doc in enumerate(self.part_doc):
+            for _ in doc:
+                self.doc_index2_part[index] = idx
+                index += 1
 
     def get_query_context(self, query, top_k=3):
-        parts = self._prepare_inputs(query)
-        # print(parts)
-        res = [self.content[a[0]:a[1]] for a in parts]
-        # print(res)
-        if len(parts)  <= top_k:
+        spanset = self._do_mrc(query)
+        res = self._locate_cut_content(spanset, top_k)
+        if len(res)  <= top_k:
             # res.reverse()
             return res
         else:
@@ -647,7 +678,7 @@ if __name__ == "__main__":
     ins = QAContext()
     text = open(sys.argv[1]).read()
     query = sys.argv[2]
-    ins.refresh_data(text)
+    ins.refresh_data(text.strip())
     reslist = ins.get_query_context(query)
     print(reslist)
     print(len(''.join(reslist)))
