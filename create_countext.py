@@ -9,6 +9,8 @@ from __future__ import division
 from __future__ import print_function
 import sys
 import codecs
+import time
+
 import numpy as np
 import faiss
 import torch
@@ -17,6 +19,7 @@ from transformers import BertTokenizer, AutoTokenizer
 import langid
 from typing import Optional, Tuple
 import collections
+import json
 
 def postprocess_qa_predictions(
     examples,
@@ -307,9 +310,10 @@ class QAContext():
         self.force_break_punctations = {',', ';', '，', '；'}
         self.MAX_SENT_LEN = 512
         self.MIN_SENT_LEN = 256
-        self.BATCH_SIZE = 256
-        self.max_seq_length = 384
-        self.max_content_length = 1500
+        self.BATCH_SIZE = 64
+        self.max_seq_length = 512
+        self.max_content_length = 1300
+        self.max_span_size = 10
 
     def _break_sentence(self, text: str):
         # 转换成小写
@@ -416,7 +420,7 @@ class QAContext():
                 examples["context"],
                 truncation="only_second",
                 max_length=self.max_seq_length,
-                stride=128,
+                stride=256,
                 return_overflowing_tokens=True,
                 return_offsets_mapping=True,
                 padding=True
@@ -456,6 +460,10 @@ class QAContext():
         tokenized_examples = self._prepare_validation_features(example_batch)
         input_ids, attention_mask = np.array(tokenized_examples['input_ids']), np.array(tokenized_examples['attention_mask'])  # 模型测试输入数据
         steps = input_ids.shape[0] // self.BATCH_SIZE
+        print(steps, file=sys.stderr)
+        if steps > 20:
+            print("content is to long", file=sys.stderr)
+            return {}
         start_logits, end_logits = [], []
         for i in range(steps+1):
             RM_batch = (input_ids[i*self.BATCH_SIZE: (i+1)*self.BATCH_SIZE, :], attention_mask[i*self.BATCH_SIZE: (i+1)*self.BATCH_SIZE, :])
@@ -521,16 +529,28 @@ class QAContext():
             else:
                 return rightend
 
+    # def _find_parts(self, spanset, partlen):
+    #     newspan = []
+    #     for a in spanset:
+    #         if partlen < 128:
+    #             left_text = self._find_left(a[0], 64)
+    #             right_text = self._find_right(a[1], 64)
+    #             newspan.append((left_text, right_text, a[2]))
+    #             break
+    #         left_text = self._find_left(a[0], partlen // 4)
+    #         right_text = self._find_right(a[1], partlen // 4)
+    #         partlen = partlen + left_text - right_text
+    #         newspan.append((left_text, right_text, a[2]))
+    #     newspan = self._merge_set(newspan)
+    #     res = [self.content[a[0]:a[1]] for a in newspan]
+    #     return res
+
     def _find_parts(self, spanset, partlen):
+        steplen = partlen // len(spanset) // 2 + 24
         newspan = []
         for a in spanset:
-            if partlen < 128:
-                left_text = self._find_left(a[0], 64)
-                right_text = self._find_right(a[1], 64)
-                newspan.append((left_text, right_text, a[2]))
-                break
-            left_text = self._find_left(a[0], partlen // 4)
-            right_text = self._find_right(a[1], partlen // 4)
+            left_text = self._find_left(a[0], steplen)
+            right_text = self._find_right(a[1], steplen)
             partlen = partlen + left_text - right_text
             newspan.append((left_text, right_text, a[2]))
         newspan = self._merge_set(newspan)
@@ -585,6 +605,7 @@ class QAContext():
             }
 
         all_nbest_json = self._process(example_batch)
+        # print(all_nbest_json)
         all_span = []
         for k, vlist in all_nbest_json.items():
             start = 0
@@ -596,8 +617,14 @@ class QAContext():
         return spanset
 
     def _locate_answer(self, spanset):
+        spanset = spanset[:self.max_span_size]
         if self.is_chinese:
+            if len(spanset) == 0:
+                print("empty spanset", file=sys.stderr)
+                return self.context_inputs[:3]
             return self._find_parts(spanset, self.max_content_length)
+        if len(spanset) == 0:
+            spanset = [(0, 10, 1), (len(self.content)//2, len(self.content)//2+1, 2), (len(self.content)-1, len(self.content), 1)]
         tokenized_offsets = self.tokenizer(
             self.content,
             truncation=True,
@@ -631,8 +658,8 @@ class QAContext():
                     index2maxscore[locate] = score
         sort_doc = sorted(index2maxscore.items(), key=lambda x:x[1], reverse=True)
         res = []
-        for k, v in index2res.items():
-            print(self.part_doc[k], v, sep='\t')
+        # for k, v in index2res.items():
+        #     print(self.part_doc[k], v, sep='\t')
         for k, v in sort_doc[:topk]:
             res.append(self.part_doc[k])
         return res
@@ -662,23 +689,49 @@ class QAContext():
 
     def get_query_context(self, query, top_k=3):
         spanset = self._do_mrc(query)
-        res = self._locate_cut_content(spanset, top_k)
-        if len(res)  <= top_k:
-            # res.reverse()
-            return res
-        else:
-            tail = res[top_k:]
-            # tail.reverse()
-            tailstr = ' '.join(tail)
-            newres = res[:top_k] + [tailstr]
-            # newres.reverse()
-            return newres
+        # res = self._locate_cut_content(spanset, top_k)
+        top_k = top_k - 1
+        res = self._locate_answer(spanset)
+        return res
+        # if len(res)  <= top_k:
+        #     # res.reverse()
+        #     return res
+        # else:
+        #     tail = res[top_k:]
+        #     # tail.reverse()
+        #     tailstr = ' '.join(tail)
+        #     newres = res[:top_k] + [tailstr]
+        #     # newres.reverse()
+        #     return newres
 
 if __name__ == "__main__":
     ins = QAContext()
-    text = open(sys.argv[1]).read()
-    query = sys.argv[2]
-    ins.refresh_data(text.strip())
-    reslist = ins.get_query_context(query)
-    print(reslist)
-    print(len(''.join(reslist)))
+    # text = open(sys.argv[1]).read()
+    # query = sys.argv[2]
+    # ins.refresh_data(text.strip())
+    # reslist = ins.get_query_context(query)
+    # for k in reslist:
+    #     print(k)
+    # print(len(''.join(reslist)))
+    # for text, queries in zip(open(sys.argv[1]), open(sys.argv[2])):
+    for line in open(sys.argv[1]):
+        items = eval(line)
+        # text = text.strip()
+        # queries = eval(queries)
+        text = items[0]
+        queries = items[1:]
+        ins.refresh_data(text)
+        for query in queries:
+            if len(text) < ins.max_content_length:
+                obj = {
+                    'query': query,
+                    'content': [text]
+                }
+                print(json.dumps(obj, ensure_ascii=False))
+                continue
+            res = ins.get_query_context(query)
+            obj = {
+                'query': query,
+                'content': res
+            }
+            print(json.dumps(obj, ensure_ascii=False))

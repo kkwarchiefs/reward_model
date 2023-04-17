@@ -74,7 +74,7 @@ class Squad(datasets.GeneratorBasedBuilder):
 
     BUILDER_CONFIGS = [
         SquadConfig(
-            name="squad_cmrc",
+            name="squad_cmrc_compare",
             version=datasets.Version("1.2.1", ""),
             description="Plain text",
         ),
@@ -116,7 +116,7 @@ class Squad(datasets.GeneratorBasedBuilder):
             datasets.SplitGenerator(name=datasets.Split.TRAIN,
                                     gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/qa_data/squad_cmrc_train.json'}),
             datasets.SplitGenerator(name=datasets.Split.VALIDATION,
-                                    gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/qa_data/squad_cmrc_dev.json'}),
+                                    gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/qa_data/dev_multi.json'}),
         ]
 
     def _generate_examples(self, filepath):

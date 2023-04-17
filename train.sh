@@ -376,7 +376,7 @@ python3 -m torch.distributed.launch --nproc_per_node 8 multi_qa.py \
   --dataset_name squad.py \
   --do_train \
   --do_eval \
-  --per_device_train_batch_size 60 \
+  --per_device_train_batch_size 100 \
   --logging_steps 20 \
   --learning_rate 3e-5 \
   --num_train_epochs 10 \
@@ -384,8 +384,11 @@ python3 -m torch.distributed.launch --nproc_per_node 8 multi_qa.py \
   --doc_stride 256 \
   --overwrite_output_dir \
   --version_2_with_negative \
-  --evaluation_strategy epoch \
-  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/squad_cmrc
+  --evaluation_strategy steps \
+  --eval_steps 2000 \
+  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/squad_cmrc_compare
+
+
 
 
 python3 -m torch.distributed.launch --nproc_per_node 8 multi_qa.py \
@@ -402,4 +405,4 @@ python3 -m torch.distributed.launch --nproc_per_node 8 multi_qa.py \
   --overwrite_output_dir \
   --version_2_with_negative \
   --evaluation_strategy epoch \
-  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/squad_cmrc_du
+  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/squad_cmrc_du_wiki_nyt

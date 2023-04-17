@@ -15,7 +15,7 @@ device = torch.device('cuda:0')
 
 
 
-RM_model_path = "/search/ai/jamsluo/GLM_RLHF/reward_model/output/multi_qa_v2"
+RM_model_path = "/search/ai/jamsluo/GLM_RLHF/reward_model/output/squad_cmrc_du_wiki_nyt/"
 
 tokenizer = AutoTokenizer.from_pretrained(RM_model_path, trust_remote_code=True)
 config = AutoConfig.from_pretrained(
