@@ -11,8 +11,6 @@ import sys
 import codecs
 import time
 
-import numpy as np
-import faiss
 import torch
 import tritonclient.http as httpclient
 from transformers import BertTokenizer, AutoTokenizer
@@ -20,6 +18,12 @@ import langid
 from typing import Optional, Tuple
 import collections
 import json
+from  bm25_search import  *
+import jieba
+
+model_path = "/search/ai/pretrain_models/infoxlm-base/"
+tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+
 
 def postprocess_qa_predictions(
     examples,
@@ -272,16 +276,12 @@ class SearchContext():
         return results
 
     def get_doc_embedding_index(self, text):
-        inputs = SearchContext.cut_doc(text, piece_len=500)
-        emb = self.get_embedding(inputs)
-        self.doc_piece_emb_index = faiss.IndexFlatL2(emb.shape[1])
-        self.doc_piece_emb_index.add(emb)
+        inputs = SearchContext.cut_doc_plus(text, piece_len=500)
+        self.doc_embedding = self.get_embedding(inputs)
         return inputs
 
     @staticmethod
-    def cut_doc(data, piece_len=750, single_piece_max_len=1700):
-        if len(data)<single_piece_max_len:
-            return [data]
+    def cut_doc(data, piece_len=750):
         piece_data = []
         index = 0
         while index < len(data):
@@ -289,14 +289,36 @@ class SearchContext():
             index += piece_len
         return piece_data
 
+    @staticmethod
+    def cut_doc_plus(data, piece_len=750):
+        tokens = tokenizer(
+            data,
+            return_offsets_mapping=True,
+        )
+        offset = tokens['offset_mapping'][1:-1]
+        index = 0
+        piece_data = []
+        last_index = 0
+        while index < len(offset):
+            index += piece_len
+            if index < len(offset):
+                temp_data = data[offset[last_index][0]: offset[index][1]]
+            else:
+                temp_data = data[offset[last_index][0]:]
+            piece_data.append(temp_data)
+            last_index = index
+        return piece_data
+
     def get_query_context(self, query, top_k=3):
         query_emb = self.get_embedding(query)
-        sim_list, index_list = self.doc_piece_emb_index.search(query_emb, min(top_k, len(self.doc_piece_list)))
+        scores = np.matmul(
+            query_emb,
+            self.doc_embedding.transpose(1, 0))[0]
         context = []
-        index_list = index_list.tolist()[0]
-        index_list.sort()
+        index_list = np.argsort(scores)[::-1]
         for index in index_list:
             context.append(self.doc_piece_list[index])
+            print(self.doc_piece_list[index], scores[index])
         return context
 
 class QAContext():
@@ -460,9 +482,9 @@ class QAContext():
         tokenized_examples = self._prepare_validation_features(example_batch)
         input_ids, attention_mask = np.array(tokenized_examples['input_ids']), np.array(tokenized_examples['attention_mask'])  # 模型测试输入数据
         steps = input_ids.shape[0] // self.BATCH_SIZE
-        print(steps, file=sys.stderr)
+        # print(steps, file=sys.stderr)
         if steps > 20:
-            print("content is to long", file=sys.stderr)
+            # print("content is to long", file=sys.stderr)
             return {}
         start_logits, end_logits = [], []
         for i in range(steps+1):
@@ -478,6 +500,7 @@ class QAContext():
         for i in range(len(example_batch['id'])):
             examples.append({k: example_batch[k][i] for k in example_batch.keys()})
         all_nbest_json = postprocess_qa_predictions(examples, feautures, predict_tuple)
+        # print(all_nbest_json)
         return all_nbest_json
 
     def _merge_set(self, spans):
@@ -566,8 +589,12 @@ class QAContext():
             return idx2pair[left - spanlen][0], left - spanlen
     @staticmethod
     def find_right_idx(char2idx, idx2pair, righttid, spanlen):
+        # print(len(idx2pair), righttid, spanlen)
         right = char2idx[righttid]
-        if right + spanlen > len(idx2pair):
+        # print(right)
+        # print(idx2pair[len(idx2pair) - 1][1])
+        # print(idx2pair)
+        if right + spanlen >= len(idx2pair):
             return idx2pair[len(idx2pair) - 1][1], len(idx2pair) - 1
         else:
             return idx2pair[right + spanlen][1], right + spanlen
@@ -582,10 +609,13 @@ class QAContext():
                 break
             text_left, token_left = QAContext.find_left_idx(char2idx, idx2pair, a[0], partlen // 4)
             text_right, token_right = QAContext.find_right_idx(char2idx, idx2pair, a[1], partlen // 4)
+            # print(text_right, token_right)
             partlen = partlen + token_left - token_right
             newspan.append((text_left, text_right, a[2]))
+        # print(newspan)
         newspan = self._merge_set(newspan)
         res = [self.content[a[0]:a[1]] for a in newspan]
+        # exit(-1)
         return res
 
     def _do_mrc(self, query):
@@ -605,7 +635,7 @@ class QAContext():
             }
 
         all_nbest_json = self._process(example_batch)
-        # print(all_nbest_json)
+        print(all_nbest_json)
         all_span = []
         for k, vlist in all_nbest_json.items():
             start = 0
@@ -620,18 +650,18 @@ class QAContext():
         spanset = spanset[:self.max_span_size]
         if self.is_chinese:
             if len(spanset) == 0:
-                print("empty spanset", file=sys.stderr)
+                # print("empty spanset", file=sys.stderr)
                 return self.context_inputs[:3]
             return self._find_parts(spanset, self.max_content_length)
-        if len(spanset) == 0:
-            spanset = [(0, 10, 1), (len(self.content)//2, len(self.content)//2+1, 2), (len(self.content)-1, len(self.content), 1)]
+        # if len(spanset) == 0:
+        #     spanset = [(0, 10, 1), (len(self.content)//2, len(self.content)//2+1, 2), (len(self.content)-1, len(self.content), 1)]
         tokenized_offsets = self.tokenizer(
             self.content,
             truncation=True,
             max_length=len( self.content),
             return_offsets_mapping=True,
         )
-        offset_mapping = tokenized_offsets["offset_mapping"]
+        offset_mapping = tokenized_offsets["offset_mapping"][1:-1]
         charid2idx = {}
         idx2pair = {}
         last_idx = 0
@@ -643,6 +673,8 @@ class QAContext():
             for i in range(start, end):
                 charid2idx[i] = idx
             idx2pair[idx] = (start, end)
+        # print(charid2idx)
+        # exit(-1)
         return self._find_parts_idx(charid2idx, idx2pair, spanset, self.max_content_length)
 
     def _locate_cut_content(self, spanset, topk):
@@ -679,7 +711,7 @@ class QAContext():
                 else:
                     self.context_inputs.append(context_parts[i])
         # part strategy
-        self.part_doc = SearchContext.cut_doc(self.content, piece_len=500)
+        self.part_doc = SearchContext.cut_doc_plus(self.content, piece_len=500)
         index = 0
         self.doc_index2_part = {}
         for idx, doc in enumerate(self.part_doc):
@@ -691,6 +723,7 @@ class QAContext():
         spanset = self._do_mrc(query)
         # res = self._locate_cut_content(spanset, top_k)
         top_k = top_k - 1
+        print(spanset)
         res = self._locate_answer(spanset)
         return res
         # if len(res)  <= top_k:
@@ -703,16 +736,70 @@ class QAContext():
         #     newres = res[:top_k] + [tailstr]
         #     # newres.reverse()
         #     return newres
+class BM25():
 
-if __name__ == "__main__":
-    ins = QAContext()
-    # text = open(sys.argv[1]).read()
-    # query = sys.argv[2]
-    # ins.refresh_data(text.strip())
-    # reslist = ins.get_query_context(query)
-    # for k in reslist:
-    #     print(k)
-    # print(len(''.join(reslist)))
+    def __init__( self, stop_word=StopWords):
+        '''
+        '''
+        self.stop_word = StopWords()
+
+    # init
+    def init(self, words_list=None, update=True):
+        word_list = self._seg_word(words_list)
+        self.bm25 = BM25Okapi(word_list)
+        return self
+
+    '''
+    # seg word
+    def _seg_word(self, words_list, jieba_flag=True, del_stopword=False):
+        if jieba_flag:
+            word_list = [[self.stop_word.del_stopwords(words) if del_stopword else word for word in jieba.cut(words)] for words in words_list]
+        else:
+            word_list = [[self.stop_word.del_stopwords(words) if del_stopword else word for word in words] for words in words_list]
+        print( 'word_list>>>', word_list )
+        return [ ' '.join(word) for word in word_list  ]
+    '''
+    # seg word
+    def _seg_word(self, words_list, jieba_flag=True, del_stopword=False):
+        word_list = []
+        if jieba_flag:
+            for words in words_list:
+                if del_stopword:
+                    if words!='' and type(words) == str:
+                        word_list.append( [word for word in self.stop_word.del_stopwords(jieba.cut(words))] )
+                else:
+                    if words!='' and type(words) == str:
+                        word_list.append( [word for word in jieba.cut(words)] )
+        else:
+            for words in words_list:
+                if del_stopword:
+                    if words!='' and type(words) == str:
+                        word_list.append( [word for word in self.stop_word.del_stopwords(words)] )
+                else:
+                    if words!='' and type(words) == str:
+                        word_list.append( [word for word in words] )
+        return [ ' '.join(word) for word in word_list  ]
+
+
+    def predict(self, words):
+        return self.bm25.get_scores( self._seg_word([words])[0] )
+
+    def refresh_data(self, context):
+        content = context.replace("\n", '')
+        self.part_doc = SearchContext.cut_doc_plus(content, piece_len=500)
+        self.init(self.part_doc, update=True)
+
+    def get_query_context(self, query, top_k=3):
+        pre = self.predict(query)
+        scores = np.array(pre)
+        idx = np.argsort(scores)[::-1]
+        res = []
+        for i in idx[:top_k]:
+            res.append(self.part_doc[i])
+        return res
+
+
+def line_search():
     # for text, queries in zip(open(sys.argv[1]), open(sys.argv[2])):
     for line in open(sys.argv[1]):
         items = eval(line)
@@ -735,3 +822,72 @@ if __name__ == "__main__":
                 'content': res
             }
             print(json.dumps(obj, ensure_ascii=False))
+
+def split_doc():
+    rm_model_path = "/search/ai/pretrain_models/infoxlm-base/"
+    tokenizer = AutoTokenizer.from_pretrained(rm_model_path, trust_remote_code=True)
+    for line in sys.stdin:
+        items = eval(line)
+        tokens = tokenizer(
+            items[0],
+        )
+        if len(tokens['input_ids']) > 20000:
+            continue
+        text = items[0].replace('\r', ' ').replace('\n', ' ').replace('\t', ' ').strip().replace('"', '')
+        print(text, '\t'.join(items[1:]), sep='\t')
+
+
+def auto():
+    for line in open(sys.argv[1]):
+        items = line.strip().split('\t')
+        if len(items) != 7:
+            print(line.strip(), file=sys.stderr)
+            continue
+        queries = items[1:4]
+        aws = items[4:]
+        text = items[0]
+        print(text.strip(), '\t'.join(queries), sep='\t')
+        ins = BM25()
+        text = text.replace('\n', ' ').replace('\t', ' ').strip()
+        ins.refresh_data(text)
+        res = []
+        all_count = []
+        for query, aw in zip(queries, aws):
+            reslist = ins.get_query_context(query)
+            resstr = '||'.join(reslist)
+            all_count.append(resstr.count(aw))
+            res.append(query+"###"+resstr)
+        print("bm25", '\t'.join(res), sep='\t')
+        ins = SearchContext()
+        text = text.replace('\n', ' ').replace('\t', ' ').strip()
+        ins.refresh_data(text)
+        res = []
+        for query, aw in zip(queries, aws):
+            reslist = ins.get_query_context(query)
+            resstr = '||'.join(reslist)
+            all_count.append(resstr.count(aw))
+            res.append(query+"###"+resstr)
+        print("bi-encoder", '\t'.join(res), sep='\t')
+        ins = QAContext()
+        text = text.replace('\n', ' ').replace('\t', ' ').strip()
+        ins.refresh_data(text)
+        res = []
+        for query, aw in zip(queries, aws):
+            reslist = ins.get_query_context(query)
+            resstr = '||'.join(reslist)
+            all_count.append(resstr.count(aw))
+            res.append(query+"###"+resstr)
+        print("mrc", '\t'.join(res), sep='\t')
+        print(all_count, sum(all_count[:3]), sum(all_count[3:6]), sum(all_count[6:]), sep='\t')
+
+
+if __name__ == "__main__":
+    text = open(sys.argv[1]).read()
+    query = sys.argv[2]
+    ins = SearchContext()
+    text = text.replace('\n', ' ').replace('\t', ' ').strip()
+    ins.refresh_data(text)
+    reslist = ins.get_query_context(query)
+    print("bi-encoder", '\t'.join(reslist), sep='\t')
+
+

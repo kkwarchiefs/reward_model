@@ -16,7 +16,7 @@ import numpy as np
 import math
 import numpy as np
 from multiprocessing import Pool, cpu_count
-from create_countext import SearchContext
+
 class BM25:
     def __init__(self, corpus, tokenizer=None):
         self.corpus_size = 0
@@ -225,55 +225,6 @@ class StopWords(object):
 
     def del_stopwords(self, words):
         return [word for word in words if word not in self.stopwords]
-
-
-class BM25():
-
-    def __init__( self, stop_word=StopWords):
-        '''
-        '''
-        self.stop_word = StopWords()
-
-    # init
-    def init(self, words_list=None, update=True):
-        word_list = self._seg_word(words_list)
-        self.bm25 = BM25Okapi(word_list)
-        return self
-
-    '''
-    # seg word
-    def _seg_word(self, words_list, jieba_flag=True, del_stopword=False):
-        if jieba_flag:
-            word_list = [[self.stop_word.del_stopwords(words) if del_stopword else word for word in jieba.cut(words)] for words in words_list]
-        else:
-            word_list = [[self.stop_word.del_stopwords(words) if del_stopword else word for word in words] for words in words_list]
-        print( 'word_list>>>', word_list )
-        return [ ' '.join(word) for word in word_list  ]
-    '''
-    # seg word
-    def _seg_word(self, words_list, jieba_flag=True, del_stopword=False):
-        word_list = []
-        if jieba_flag:
-            for words in words_list:
-                if del_stopword:
-                    if words!='' and type(words) == str:
-                        word_list.append( [word for word in self.stop_word.del_stopwords(jieba.cut(words))] )
-                else:
-                    if words!='' and type(words) == str:
-                        word_list.append( [word for word in jieba.cut(words)] )
-        else:
-            for words in words_list:
-                if del_stopword:
-                    if words!='' and type(words) == str:
-                        word_list.append( [word for word in self.stop_word.del_stopwords(words)] )
-                else:
-                    if words!='' and type(words) == str:
-                        word_list.append( [word for word in words] )
-        return [ ' '.join(word) for word in word_list  ]
-
-
-    def predict(self, words):
-        return self.bm25.get_scores( self._seg_word([words])[0] )
 
 if __name__ == "__main__":
     text = open(sys.argv[1]).read()
