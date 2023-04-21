@@ -21,7 +21,7 @@ import json
 from  bm25_search import  *
 import jieba
 
-model_path = "/search/ai/pretrain_models/infoxlm-base/"
+model_path = "/search/ai/pretrain_models/chatglm-6b/"
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 
 
@@ -244,11 +244,13 @@ class DSU:
 
 class SearchContext():
     def __init__(self):
-        self.model_name = "embedding_mul_onnx"  # 模型目录名/venus注册模型名称
+        # self.model_name = "embedding_mul_onnx"  # 模型目录名/venus注册模型名称
+        self.model_name = "embedding_pooling_onnx"
         address = "10.212.207.33:8000"  # 机器地址
         self.triton_client = httpclient.InferenceServerClient(url=address)
         rm_model_path = "/search/ai/pretrain_models/infoxlm-base/"
         self.tokenizer = AutoTokenizer.from_pretrained(rm_model_path, trust_remote_code=True)
+        self.piece_len = 400
 
     def refresh_data(self, text):
         self.doc_piece_list = self.get_doc_embedding_index(text)
@@ -276,7 +278,7 @@ class SearchContext():
         return results
 
     def get_doc_embedding_index(self, text):
-        inputs = SearchContext.cut_doc_plus(text, piece_len=500)
+        inputs = SearchContext.cut_doc_plus(text, piece_len=self.piece_len)
         self.doc_embedding = self.get_embedding(inputs)
         return inputs
 
@@ -290,7 +292,24 @@ class SearchContext():
         return piece_data
 
     @staticmethod
-    def cut_doc_plus(data, piece_len=750):
+    def cut_doc_plus(data, piece_len=400):
+        tokens = tokenizer(data)
+        tokens_ids = tokens['input_ids'][1:-2]
+        index = 0
+        piece_data = []
+        last_index = 0
+        while index < len(tokens_ids):
+            index += piece_len
+            if index < len(tokens_ids):
+                temp_data = tokenizer.decode(tokens_ids[last_index: index])
+            else:
+                temp_data = tokenizer.decode(tokens_ids[last_index:])
+            piece_data.append(temp_data)
+            last_index = index
+        return piece_data
+
+    @staticmethod
+    def cut_doc_old(data, piece_len=750):
         tokens = tokenizer(
             data,
             return_offsets_mapping=True,
@@ -302,7 +321,7 @@ class SearchContext():
         while index < len(offset):
             index += piece_len
             if index < len(offset):
-                temp_data = data[offset[last_index][0]: offset[index][1]]
+                temp_data = data[offset[last_index][0]: offset[index-1][1]]
             else:
                 temp_data = data[offset[last_index][0]:]
             piece_data.append(temp_data)
@@ -316,7 +335,7 @@ class SearchContext():
             self.doc_embedding.transpose(1, 0))[0]
         context = []
         index_list = np.argsort(scores)[::-1]
-        for index in index_list:
+        for index in index_list[:top_k]:
             context.append(self.doc_piece_list[index])
             print(self.doc_piece_list[index], scores[index])
         return context
@@ -618,7 +637,7 @@ class QAContext():
         # exit(-1)
         return res
 
-    def _do_mrc(self, query):
+    def do_mrc(self, query):
         if self.is_chinese:
             example_batch = {
                 "id": [str(i) for i in range(len(self.context_inputs))],
@@ -635,7 +654,7 @@ class QAContext():
             }
 
         all_nbest_json = self._process(example_batch)
-        print(all_nbest_json)
+        # print(all_nbest_json)
         all_span = []
         for k, vlist in all_nbest_json.items():
             start = 0
@@ -720,11 +739,12 @@ class QAContext():
                 index += 1
 
     def get_query_context(self, query, top_k=3):
-        spanset = self._do_mrc(query)
+        spanset = self.do_mrc(query)
         # res = self._locate_cut_content(spanset, top_k)
         top_k = top_k - 1
-        print(spanset)
+        # print(spanset)
         res = self._locate_answer(spanset)
+        print(res)
         return res
         # if len(res)  <= top_k:
         #     # res.reverse()
@@ -800,28 +820,34 @@ class BM25():
 
 
 def line_search():
+    ins = SearchContext()
     # for text, queries in zip(open(sys.argv[1]), open(sys.argv[2])):
+    fout = open(sys.argv[2], 'w')
     for line in open(sys.argv[1]):
-        items = eval(line)
-        # text = text.strip()
-        # queries = eval(queries)
-        text = items[0]
-        queries = items[1:]
+        items = line.strip().split('\t')
+        text = items[0].strip()
+        queries = eval(items[1])
+        # items = eval(line)
+        # text = items[0]
+        # queries = items[1:]
         ins.refresh_data(text)
+        tokens = tokenizer(text)
+        tokens_ids = tokens['input_ids'][1:-2]
         for query in queries:
-            if len(text) < ins.max_content_length:
+            if len(tokens_ids) < 1500:
                 obj = {
                     'query': query,
                     'content': [text]
                 }
-                print(json.dumps(obj, ensure_ascii=False))
+                print(json.dumps(obj, ensure_ascii=False), file=fout)
                 continue
             res = ins.get_query_context(query)
             obj = {
                 'query': query,
                 'content': res
             }
-            print(json.dumps(obj, ensure_ascii=False))
+            print(json.dumps(obj, ensure_ascii=False), file=fout)
+    fout.close()
 
 def split_doc():
     rm_model_path = "/search/ai/pretrain_models/infoxlm-base/"
@@ -882,12 +908,13 @@ def auto():
 
 
 if __name__ == "__main__":
-    text = open(sys.argv[1]).read()
-    query = sys.argv[2]
-    ins = SearchContext()
-    text = text.replace('\n', ' ').replace('\t', ' ').strip()
-    ins.refresh_data(text)
-    reslist = ins.get_query_context(query)
-    print("bi-encoder", '\t'.join(reslist), sep='\t')
+    line_search()
+    # text = open(sys.argv[1]).read()
+    # query = sys.argv[2]
+    # ins = SearchContext()
+    # text = text.replace('\n', ' ').replace('\t', ' ').strip()
+    # ins.refresh_data(text)
+    # reslist = ins.get_query_context(query)
+    # print("bi-encoder", '\t'.join(reslist), sep='\t')
 
 

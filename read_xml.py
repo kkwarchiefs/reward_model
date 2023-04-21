@@ -26,11 +26,13 @@ import json
 from bm25_search import *
 from create_countext import QAContext
 import logging
+import pandas as pd
+
 logging.basicConfig(level=logging.DEBUG)
-model_path = "/search/ai/pretrain_models/infoxlm-base/"
+model_path = "/search/ai/pretrain_models/chatglm-6b/"
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 
-class SearchContext():
+class PaperContext():
     def __init__(self):
         self.model_name = "embedding_pooling_onnx"  # 模型目录名/venus注册模型名称
         address = "10.212.207.33:8000"  # 机器地址
@@ -43,7 +45,8 @@ class SearchContext():
         self.paper = Paper()
         self.paper.read_xml(filename)
         self.paper.split_document()
-        self.subsections_embedding = self.get_embedding(self.paper.subsections)
+        part_docs = [a.__repr__() for a in self.paper.subsections]
+        self.subsections_embedding = self.get_embedding(part_docs)
         para = defaultdict(list)
         for i in range(len(self.subsections_embedding)):
             j = self.paper.subindex[i]
@@ -98,53 +101,21 @@ class SearchContext():
         return results
 
     @staticmethod
-    def cut_doc(data, piece_len=750):
-        piece_data = []
-        index = 0
-        while index < len(data):
-            piece_data.append(data[index: index + piece_len])
-            index += piece_len
-        return piece_data
-
-    @staticmethod
-    def cut_doc_plus(data, piece_len=750):
-        tokens = tokenizer(
-            data,
-            return_offsets_mapping=True,
-        )
-        offset = tokens['offset_mapping'][1:-1]
+    def cut_doc_mean(data, piece_len=400):
+        tokens = tokenizer(data)
+        tokens_ids = tokens['input_ids'][1:-1]
+        steps = len(tokens_ids) // piece_len + 1
+        mean_len = len(tokens_ids) // steps + 1
         index = 0
         piece_data = []
         last_index = 0
-        while index < len(offset):
-            index += piece_len
-            if index < len(offset):
-                temp_data = data[offset[last_index][0]: offset[index-1][1]]
-            else:
-                temp_data = data[offset[last_index][0]:]
-            piece_data.append(temp_data)
-            last_index = index
-        return piece_data
-
-    @staticmethod
-    def cut_doc_mean(data, piece_len=500):
-        tokens = tokenizer(
-            data,
-            return_offsets_mapping=True,
-        )
-        offset = tokens['offset_mapping'][1:-1]
-        steps = len(offset) // piece_len + 1
-        mean_len = len(offset) // steps  + 1
-        index = 0
-        piece_data = []
-        last_index = 0
-        while index < len(offset):
+        while index < len(tokens_ids):
             index += mean_len
-            if index < len(offset):
-                temp_data = data[offset[last_index][0]: offset[index-1][1]]
+            if index < len(tokens_ids):
+                temp_data = tokenizer.decode(tokens_ids[last_index: index])
             else:
-                temp_data = data[offset[last_index][0]:]
-            temp_len = min(index-1, len(offset)) - last_index
+                temp_data = tokenizer.decode(tokens_ids[last_index:])
+            temp_len = min(index, len(tokens_ids)) - last_index
             piece_data.append((temp_data, temp_len))
             last_index = index
         return piece_data
@@ -158,17 +129,45 @@ class SearchContext():
         index_list = np.argsort(scores)[::-1]
         max_len = self.max_token_length
         context = []
-        for index in index_list[:top_k]:
-            print(self.paper.subsections[index], scores[index], self.paper.sub_length[index], sep='###')
-            mrc.refresh_data(self.paper.subsections[index])
-            reslist = mrc.get_query_context(query)
-            print(reslist)
-            parent = self.paper.subindex[index]
-            neighbours = self.paper.subindex_reverse[parent]
-            print([scores[a] for a in neighbours])
+        print("="*20)
+        print(query)
+        parent_set = set()
+        for index in index_list:
+            sub_para = self.paper.subsections[index]
+            # mrc.refresh_data(self.paper.subsections[index])
+            #
+            # reslist = mrc.get_query_context(query)
+            # print(reslist)
+            # parent = self.paper.subindex[index]
+            # neighbours = self.paper.subindex_reverse[parent]
+            # print([scores[a] for a in neighbours])
             if max_len > 0:
-                context.append(self.paper.subsections[index])
-                max_len -= self.paper.sub_length[index]
+                # mrc.refresh_data(self.paper.subsections[index])
+                # reslist = mrc.do_mrc(query)
+                # if len(reslist) == 0:
+                #     print("=====empty=====", self.paper.subsections[index], scores[index], self.paper.sub_length[index], sep='###')
+                #     continue
+                print(sub_para.context, scores[index], sub_para.para_length, sep='###')
+                parent = self.paper.subindex[index]
+                if parent in parent_set:
+                    continue
+                neighbours = self.paper.subindex_reverse[parent]
+                print([scores[a] for a in neighbours])
+                if len(neighbours) > 1:
+                    mrc.refresh_data(self.paper.section_lines[parent].__repr__())
+                    reslist = mrc.do_mrc(query)
+                    status = False
+                    for a in reslist:
+                        if a[0] not in list(range(sub_para.start_position[0], sub_para.start_position[1])):
+                            status = True
+                    print(reslist)
+                    if status:
+                        context.append(self.paper.section_lines[parent].__repr__())
+                        parent_set.add(parent)
+                        max_len -= sum([self.paper.subsections[a].para_length for a in neighbours])
+                        continue
+                context.append(sub_para.__repr__())
+                max_len -= sub_para.para_length
         return context
 
     def get_query_context_debug(self, query, top_k=3):
@@ -203,15 +202,17 @@ class SearchContext():
 
 
 class Paragraph:
-    def __init__(self, section_one, section_two, position, context):
+    def __init__(self, section_one, section_two, position, context, start_position=None, para_length=0):
         self.section_one = section_one
         self.section_two = section_two
         self.context = context
         self.position = position
+        self.start_position = start_position
+        self.para_length = para_length
         self.embedding = None
 
     def __repr__(self):
-        return ' '.join([self.section_one,  self.section_two, self.context, self.position])
+        return ' '.join([self.section_one, self.section_two, self.context])
 
 
 class Paper:
@@ -227,18 +228,21 @@ class Paper:
         self.subindex = {}
         self.subindex_reverse = {}
         self.subsections = []
-        self.sub_length = []
+        # self.sub_length = []
         self.part_length = 500
 
     def split_document(self):
         for idx, para in enumerate(self.section_lines):
-            parts = SearchContext.cut_doc_mean(para.context, self.part_length)
+            parts = PaperContext.cut_doc_mean(para.context, self.part_length)
             begin = len(self.subsections)
+            start_at = 0
             for part in parts:
                 self.subindex[len(self.subsections)] = idx
                 # self.subsections.append(part)
-                self.subsections.append(para.section_one + ' ' + para.section_two + ' ' + part[0])
-                self.sub_length.append(part[1])
+                sub_para = Paragraph(para.section_one, para.section_two, para.position, part[0], (start_at, len(part)), part[1])
+                start_at += len(part)
+                self.subsections.append(sub_para)
+                # self.sub_length.append(part[1])
             self.subindex_reverse[idx] = list(range(begin, len(self.subsections)))
 
     @staticmethod
@@ -333,16 +337,47 @@ class Paper:
         # for k in self.section_lines:
         #     print(k)
 
+def get_lines():
+    fout = open('test.txt', 'w')
+    for line in sys.stdin:
+        ins = Paper()
+        items = line.strip().split('\t')
+        ins.read_xml(items[1])
+        text = ''
+        for a in ins.section_lines:
+            text += a.__repr__()
+        print(text, items[0], items[2], sep='\t', file=fout)
+
+def test_score():
+    search = PaperContext()
+    ins = pd.read_csv(sys.argv[1], header=None)
+    fout = open('pdf.test.tsv', 'w')
+    for v in ins.values:
+        query = v[0]
+        search.refresh_data(v[2])
+        reslist = search.get_query_context(query, top_k=3)
+        searchres = '||'.join(reslist).lower()
+        aws = v[3].split('|')
+        rel, sea, qas = 0, 0, 0
+        # print(searchres, aws)
+        for aw in aws:
+            aw = aw.lower()
+            rel += v[1].count(aw)
+            sea += searchres.count(aw)
+            # qas += qares.count(aw)
+        print(query, [rel, sea], sea > qas,  sep='\t', file=fout)
+
 if __name__ == "__main__":
+    test_score()
+    # get_lines()
     # ins = Paper()
     # ins.read_xml('./data/2022.findings-emnlp.146.pdf.tei.xml')
     # # ins.split_document()
     # for k in ins.section_lines:
     #     print(k)
     # print(ins.subindex)
-    ins = SearchContext()
-    ins.refresh_data(sys.argv[1])
-    ins.get_query_context('PLM排序是如何工作的？', 5)
+
+    # ins.get_query_context('PLM排序是如何工作的？', 5)
     # while True:
     #     raw_text = input("\nContext prompt (stop to exit) >>> ")
     #     if not raw_text:
