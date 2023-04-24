@@ -222,25 +222,42 @@ class DSU:
     def union(self, x, y):
         a1 = self.find(x)
         a2 = self.find(y)
-        if a1[0] >= a2[0] and a1[1] <= a2[1]:
-            if a2[2] > a1[2]:
-                newa = (a2[0], a2[1], a2[2])
-                self.dsu[a1] = newa
-                self.dsu[a2] = newa
-            else:
-                self.dsu[a2] = a1
-        if a1[0] <= a2[0] and a1[1] >= a2[1]:
-            if a1[2] > a2[2]:
-                newa = (a1[0], a1[1], a1[2])
-                self.dsu[a1] = newa
-                self.dsu[a2] = newa
-            else:
-                self.dsu[a1] = a2
+        # if a1[0] >= a2[0] and a1[1] <= a2[1]:
+        #     if a2[2] > a1[2]:
+        #         self.dsu[a1] = a2
+        #     else:
+        #         newa = (a2[0], a2[1], a1[2])
+        #         self.dsu[a1] = newa
+        #         self.dsu[a2] = newa
+        #     return
+        # if a1[0] <= a2[0] and a1[1] >= a2[1]:
+        #     if a1[2] < a2[2]:
+        #         newa = (a1[0], a1[1], a2[2])
+        #         self.dsu[a1] = newa
+        #         self.dsu[a2] = newa
+        #     else:
+        #         self.dsu[a2] = a1
+        #     return
         if (a1[0] <= a2[1] and a1[1] >= a2[1]) or (a1[0] <= a2[0] and a1[1] >= a2[0]):
             newa = (min(a1[0], a2[0]), max(a1[1], a2[1]), max(a1[2], a2[2]))
             self.dsu[a2] = newa
             self.dsu[a1] = newa
         return
+    def union_pos(self, x, y):
+        a1 = self.find(x)
+        a2 = self.find(y)
+        # if a1[0] >= a2[0] and a1[1] <= a2[1]:
+        #     self.dsu[a1] = a2
+        #     return
+        # if a1[0] <= a2[0] and a1[1] >= a2[1]:
+        #     self.dsu[a2] = a1
+        #     return
+        if (a1[0] <= a2[1] and a1[1] >= a2[1]) or (a1[0] <= a2[0] and a1[1] >= a2[0]):
+            newa = (min(a1[0], a2[0]), max(a1[1], a2[1]))
+            self.dsu[a2] = newa
+            self.dsu[a1] = newa
+        return
+
 
 class SearchContext():
     def __init__(self):
@@ -278,8 +295,11 @@ class SearchContext():
         return results
 
     def get_doc_embedding_index(self, text):
-        inputs = SearchContext.cut_doc_plus(text, piece_len=self.piece_len)
-        self.doc_embedding = self.get_embedding(inputs)
+        inputs, self.offsets, self.fulltext = SearchContext.cut_doc_move(text, piece_len=self.piece_len)
+        # inputs = SearchContext.cut_doc_plus(text, piece_len=self.piece_len)
+        # print(inputs, offsets)
+        self.doc_embedding = self.get_embedding(inputs[:256])
+        print(self.doc_embedding[:, 4])
         return inputs
 
     @staticmethod
@@ -306,7 +326,34 @@ class SearchContext():
                 temp_data = tokenizer.decode(tokens_ids[last_index:])
             piece_data.append(temp_data)
             last_index = index
+        print(piece_data)
         return piece_data
+
+    @staticmethod
+    def cut_doc_move(data, piece_len=400):
+        tokens = tokenizer(data)
+        tokens_ids = tokens['input_ids'][1:-2]
+        index = 0
+        piece_data = []
+        piece_half = piece_len // 2
+        piece_length = []
+        # fulltext = tokenizer.decode(tokens_ids)
+        while index < len(tokens_ids):
+            if index == 0:
+                index += piece_len
+            else:
+                index += piece_half
+            # last_index = max(index-piece_len, 0)
+            if index < len(tokens_ids):
+                temp_data = tokenizer.decode(tokens_ids[index-piece_len: index])
+                piece_length.append((index-piece_len, index))
+            else:
+                temp_data = tokenizer.decode(tokens_ids[index-piece_len:])
+                piece_length.append((index - piece_len, len(tokens_ids)))
+            piece_data.append(temp_data)
+            # piece_length.append((start, start+len(temp_data)))
+            # start += len(tokenizer.decode(tokens_ids[index-piece_len: index-piece_half]))
+        return piece_data, piece_length, tokens_ids
 
     @staticmethod
     def cut_doc_old(data, piece_len=750):
@@ -328,6 +375,16 @@ class SearchContext():
             last_index = index
         return piece_data
 
+    @staticmethod
+    def _merge_set(spans):
+        ins = DSU()
+        for i in range(len(spans)):
+            for j in range(i + 1, len(spans)):
+                ins.union_pos(spans[i], spans[j])
+        spanset = list(set([ins.find(a) for a in spans]))
+        spanset.sort(key=lambda x: x[0])
+        return spanset
+
     def get_query_context(self, query, top_k=3):
         query_emb = self.get_embedding(query)
         scores = np.matmul(
@@ -335,9 +392,35 @@ class SearchContext():
             self.doc_embedding.transpose(1, 0))[0]
         context = []
         index_list = np.argsort(scores)[::-1]
-        for index in index_list[:top_k]:
+        print('='*20)
+        print(query)
+        for index in index_list:
             context.append(self.doc_piece_list[index])
-            print(self.doc_piece_list[index], scores[index])
+            print(self.doc_piece_list[index].replace("\n", "<n>"), index, scores[index])
+            if len(context) == top_k:
+                break
+        return context
+
+    def get_query_context_move(self, query, top_k=3):
+        query_emb = self.get_embedding(query)
+        scores = np.matmul(
+            query_emb,
+            self.doc_embedding.transpose(1, 0))[0]
+        context = []
+        context_span = []
+        index_list = np.argsort(scores)[::-1]
+        print('='*20)
+        print(query)
+        for index in index_list:
+            context.append(self.doc_piece_list[index])
+            context_span.append(self.offsets[index])
+            print(self.doc_piece_list[index].replace("\n", "<n>"), self.offsets[index], index, scores[index])
+            context_span = SearchContext._merge_set(context_span)
+            if sum([a[1] - a[0] for a in context_span]) >= 1200:
+                break
+        print(context_span, sum([a[1] - a[0] for a in context_span]))
+        context = [tokenizer.decode(self.fulltext[a[0]:a[1]]) for a in context_span]
+        print(context)
         return context
 
 class QAContext():
@@ -826,7 +909,8 @@ def line_search():
     for line in open(sys.argv[1]):
         items = line.strip().split('\t')
         text = items[0].strip()
-        queries = eval(items[1])
+        querystr = items[1].replace('<n>', '')
+        queries = eval(querystr)
         # items = eval(line)
         # text = items[0]
         # queries = items[1:]
