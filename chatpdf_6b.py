@@ -1,21 +1,23 @@
 import numpy as np
-import faiss
 import torch
 import tritonclient.http as httpclient
 from transformers import BertTokenizer, AutoTokenizer, AutoModelForSeq2SeqLM
-
+import sys
 #path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/ptuning/output/adgen-chatglm-6b-ft-5e-6/checkpoint-5000"
 #path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/ptuning/output/rc-chatglm-6b-ft-1e-5/checkpoint-5000"
 #path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/ptuning/output/rc-left-chatglm-6b-ft-1e-5/checkpoint-5000"
 #path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/ptuning/output/rc-1024-chatglm-6b-ft-04-19-19-48/checkpoint-5000"
 #path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/ptuning/output/rc-1536-chatglm-6b-ft-04-19-20-09/checkpoint-5000"
 #path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/ptuning/output/rc-left-1536-chatglm-6b-ft-1e-5/checkpoint-5000"
-path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/models/chatglm-6b/snapshots/4de8efebc837788ffbfc0a15663de8553da362a2"
+# path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/models/chatglm-6b/snapshots/4de8efebc837788ffbfc0a15663de8553da362a2"
 #path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/ptuning/output/rc-1024-chatglm-6b-ft-04-20-20-31/checkpoint-1000"
 #path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/ptuning/output/rc-1024-our-chatglm-6b-ft-04-20-18-24/checkpoint-5000"
 #path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/ptuning/output/rc-1024-chatglm-6b-ft-04-21-14-17/checkpoint-6000"
-#path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/ptuning/output/rc-1024-chatglm-6b-ft-04-23-12-05/checkpoint-6000"
-device = "cuda:4"
+# path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/ptuning/output/rc-1024-chatglm-6b-ft-04-23-12-05/checkpoint-6000"
+# path = "/search/ai/pvopliu/chatglm-6b/ChatGLM-6B/ptuning/output/rc-1536-chatglm-6b-ft-04-24-22-45/checkpoint-1000/"
+path = "/search/ai/jamsluo/chatglm_6b/output/rc-1536-chatglm-6b-128-1e-3-04-25-14-54/checkpoint-6000/"
+path = "/search/ai/jamsluo/chatglm_6b/output/chatglm-6b-lora"
+device = "cuda:3"
 tokenizer_glm  = AutoTokenizer.from_pretrained(path, trust_remote_code=True, truncation_side="left")
 #tokenizer_glm  = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
 model = AutoModelForSeq2SeqLM.from_pretrained(path, trust_remote_code=True)
@@ -45,6 +47,8 @@ class ChatPdf():
                     "中华人民共和国成立于1954年。")]
         else:
             history = []
+        # history = [("其中第1部分是A，其中第2部分是B，其中第3部分是C，根据上面内容回答问题：<n>第一部分讲了什么",
+        #             "第一部分讲了A")]
         history = []
         response, history = model.chat(tokenizer_glm, text, history=history, do_sample=False)
         print ("\n\n")
@@ -53,8 +57,8 @@ class ChatPdf():
 
     def read_data(self, file_path):
         text = open(file_path).read()
-        #self.summary = self.get_summary(text)
-        #self.questions = self.get_question(text)
+        self.summary = self.get_summary(text)
+        self.questions = self.get_question(text)
         self.doc_piece_list = self.get_doc_embedding_index(text)
 
     def get_summary(self, data):
@@ -100,10 +104,11 @@ class ChatPdf():
         query_context = self.get_query_context(query)
         #print ("检索上下文：", query_context)
         #sft_prompt = "根据下面内容回答问题：<n>%s<n>" % query.replace("\n", "<n>")
-        sft_prompt = "整个%s的摘要是：%s<n>" % (self.content_name, self.summary)
+        # sft_prompt = "整个%s的摘要是：%s<n>" % (self.content_name, self.summary)
         sft_prompt = ""
-        for index, part in enumerate(query_context):
-            sft_prompt = sft_prompt + "其中第%s部分是：%s<n>" % (index + 1, part.replace("\n", "<n>"))
+        print(query_context)
+        for index, part in enumerate(query_context[:3]):
+            sft_prompt = sft_prompt + "其中第%s部分是：%s<n>" % (index + 1, part.replace("\n", ""))
         sft_prompt = sft_prompt + "根据上面内容回答问题：<n>%s" % query.replace("\n", "<n>")
         #print (sft_prompt.replace("\n", "<n>"))
         query_ans = self.glm_inference(sft_prompt.replace("\n", "<n>"), is_mrc=True)
@@ -121,7 +126,7 @@ class ChatPdf():
         #index_list = index_list.tolist()[0]
         #index_list.sort()
         # print(index_list)
-        for index in sortid[:3]:
+        for index in sortid[:top_k]:
             context.append(self.doc_piece_list[index])
         return context
 
@@ -160,7 +165,7 @@ class ChatPdf():
         # doc_piece_list = []
         #inputs = self.cut_doc(text, piece_len=500)
         #inputs = self.cut_doc(text, piece_len=500, single_piece_max_len=1500)
-        inputs = self.cut_doc_plus(text, piece_len=400, single_piece_max_len=1000)
+        inputs = self.cut_doc_plus(text, piece_len=400, single_piece_max_len=1200)
         # try:
         #     embedding = self.openai.Embedding.create(
         #         input=inputs, model="text-embedding-ada-002"
@@ -193,10 +198,10 @@ class ChatPdf():
     def cut_doc_plus(self, data, piece_len=750, single_piece_max_len=1500, return_only_one=False):
         tokens = tokenizer_glm(data)
         tokens_ids = tokens['input_ids'][1:-2]
-        if len(tokens_ids) < single_piece_max_len:
-            return [data]
-        if return_only_one:
-            return [tokenizer_glm.decode(tokens_ids[0:single_piece_max_len])]
+        # if len(tokens_ids) < single_piece_max_len:
+        #     return [data]
+        # if return_only_one:
+        #     return [tokenizer_glm.decode(tokens_ids[0:single_piece_max_len])]
         index = 0
         piece_data = []
         last_index = 0
@@ -210,7 +215,7 @@ class ChatPdf():
             last_index = index
         return piece_data
 
-if __name__=="__main__":
+def human_input():
     chatpdf = ChatPdf()
     while True:
         path = input("请输入文件：")
@@ -225,3 +230,18 @@ if __name__=="__main__":
             if query=="exit":
                 break
             chatpdf.get_mrc(query)
+
+if __name__=="__main__":
+    fout = open('res_dropout.detail', 'w')
+    for line in sys.stdin:
+        items = line.strip().split("\t")
+        query = items[0]
+        path = items[1]
+        if "web" in path:
+            chatpdf = ChatPdf()
+        else:
+            chatpdf = ChatPdf(content_type="PDF file")
+        chatpdf.read_data(path)
+        query_ans = chatpdf.get_mrc(query)
+        print(path, chatpdf.summary, chatpdf.questions, query_ans, sep='\t', file=fout)
+    fout.close()

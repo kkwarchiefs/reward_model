@@ -295,8 +295,8 @@ class SearchContext():
         return results
 
     def get_doc_embedding_index(self, text):
-        inputs, self.offsets, self.fulltext = SearchContext.cut_doc_move(text, piece_len=self.piece_len)
-        # inputs = SearchContext.cut_doc_plus(text, piece_len=self.piece_len)
+        # inputs, self.offsets, self.fulltext = SearchContext.cut_doc_move(text, piece_len=self.piece_len)
+        inputs = SearchContext.cut_doc_plus(text, piece_len=self.piece_len)
         # print(inputs, offsets)
         self.doc_embedding = self.get_embedding(inputs[:256])
         print(self.doc_embedding[:, 4])
@@ -904,16 +904,20 @@ class BM25():
 
 def line_search():
     ins = SearchContext()
-    # for text, queries in zip(open(sys.argv[1]), open(sys.argv[2])):
-    fout = open(sys.argv[2], 'w')
-    for line in open(sys.argv[1]):
-        items = line.strip().split('\t')
-        text = items[0].strip()
-        querystr = items[1].replace('<n>', '')
-        queries = eval(querystr)
+    fout = open(sys.argv[3], 'w')
+    for text, queries in zip(open(sys.argv[1]), open(sys.argv[2])):
+    # for line in open(sys.argv[1]):
+    #     items = line.strip().split('\t')
+    #     text = items[0].strip()
+    #     querystr = items[1].replace('<n>', '')
+        try:
+            queries = eval(queries)
+        except:
+            continue
         # items = eval(line)
         # text = items[0]
         # queries = items[1:]
+        text = text.strip()
         ins.refresh_data(text)
         tokens = tokenizer(text)
         tokens_ids = tokens['input_ids'][1:-2]
