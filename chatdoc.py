@@ -69,5 +69,17 @@ def test2():
         text = open(items[1]).read().strip().replace('\n', '').replace('\t', '')
         print(text, items[0], sep='\t')
 
+
+def test_qa():
+    ins = QAContext()
+    while True:
+        path = input("请输入文件：")
+        ins.refresh_data(open(path).read())
+        while True:
+            query = input("\n请输入问题, 输入exit结束：")
+            if query=="exit":
+                break
+            ins.get_query_context(query)
+
 if __name__ == "__main__":
-    test()
+    test_qa()

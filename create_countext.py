@@ -21,7 +21,8 @@ import json
 from  bm25_search import  *
 import jieba
 
-model_path = "/search/ai/pretrain_models/chatglm-6b/"
+# model_path = "/search/ai/pretrain_models/chatglm-6b/"
+model_path = "/search/ai/pvopliu/glm_10m/GLM/GLM/convert_scripts/glm_10b_tokenizer"
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 
 
@@ -654,22 +655,6 @@ class QAContext():
             else:
                 return rightend
 
-    # def _find_parts(self, spanset, partlen):
-    #     newspan = []
-    #     for a in spanset:
-    #         if partlen < 128:
-    #             left_text = self._find_left(a[0], 64)
-    #             right_text = self._find_right(a[1], 64)
-    #             newspan.append((left_text, right_text, a[2]))
-    #             break
-    #         left_text = self._find_left(a[0], partlen // 4)
-    #         right_text = self._find_right(a[1], partlen // 4)
-    #         partlen = partlen + left_text - right_text
-    #         newspan.append((left_text, right_text, a[2]))
-    #     newspan = self._merge_set(newspan)
-    #     res = [self.content[a[0]:a[1]] for a in newspan]
-    #     return res
-
     def _find_parts(self, spanset, partlen):
         steplen = partlen // len(spanset) // 2 + 24
         newspan = []
@@ -825,7 +810,7 @@ class QAContext():
         spanset = self.do_mrc(query)
         # res = self._locate_cut_content(spanset, top_k)
         top_k = top_k - 1
-        # print(spanset)
+        print(spanset)
         res = self._locate_answer(spanset)
         print(res)
         return res
@@ -904,25 +889,27 @@ class BM25():
 
 def line_search():
     ins = SearchContext()
-    fout = open(sys.argv[3], 'w')
-    for text, queries in zip(open(sys.argv[1]), open(sys.argv[2])):
-    # for line in open(sys.argv[1]):
-    #     items = line.strip().split('\t')
-    #     text = items[0].strip()
-    #     querystr = items[1].replace('<n>', '')
-        try:
-            queries = eval(queries)
-        except:
-            continue
-        # items = eval(line)
-        # text = items[0]
-        # queries = items[1:]
+    ins.piece_len = 334
+    fout = open(sys.argv[2], 'w')
+    # for text, queries in zip(open(sys.argv[1]), open(sys.argv[2])):
+    #     try:
+    #         queries = eval(queries)
+    #     except:
+    #         continue
+    for line in open(sys.argv[1]):
+        items = line.strip().split('\t')
+        # text = items[0].strip()
+        # querystr = items[1].replace('<n>', '')
+        # queries = eval(querystr)
+        items = eval(line)
+        text = items[0]
+        queries = items[1:]
         text = text.strip()
         ins.refresh_data(text)
         tokens = tokenizer(text)
         tokens_ids = tokens['input_ids'][1:-2]
         for query in queries:
-            if len(tokens_ids) < 1500:
+            if len(tokens_ids) < 1000:
                 obj = {
                     'query': query,
                     'content': [text]
