@@ -58,9 +58,9 @@ def query_translations():
 
 def query_translations_en():
     res = []
-    for line in sys.stdin:
+    for idx, line in enumerate(sys.stdin):
         ins = json.loads(line)
-        res.append([ins["question_id"], ins["question"]])
+        res.append([idx, ins["question"]])
     step = len(res) // 10
     for i in range(step+1):
         part = res[i*10: (i+1)*10]
@@ -69,7 +69,7 @@ def query_translations_en():
             queries.append(str(id+1) + '.'+a[1])
         querystr = '\n'.join(queries)
         idx = [a[0] for a in part]
-        prompt_new = 'translation to english:\n' + querystr
+        prompt_new = 'translate to english:\n' + querystr
         obj = {
             "id": get_md5(prompt_new),
             "prompt": prompt_new,

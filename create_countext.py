@@ -264,11 +264,12 @@ class SearchContext():
     def __init__(self):
         # self.model_name = "embedding_mul_onnx"  # 模型目录名/venus注册模型名称
         self.model_name = "embedding_pooling_onnx"
-        address = "10.212.207.33:8000"  # 机器地址
+        self.rerank_name = "rerank_mul_onnx"
+        address = "10.164.164.172:8000"  # 机器地址
         self.triton_client = httpclient.InferenceServerClient(url=address)
         rm_model_path = "/search/ai/pretrain_models/infoxlm-base/"
         self.tokenizer = AutoTokenizer.from_pretrained(rm_model_path, trust_remote_code=True)
-        self.piece_len = 400
+        self.piece_len = 330
 
     def refresh_data(self, text):
         self.doc_piece_list = self.get_doc_embedding_index(text)
@@ -300,7 +301,6 @@ class SearchContext():
         inputs = SearchContext.cut_doc_plus(text, piece_len=self.piece_len)
         # print(inputs, offsets)
         self.doc_embedding = self.get_embedding(inputs[:256])
-        print(self.doc_embedding[:, 4])
         return inputs
 
     @staticmethod
@@ -402,6 +402,24 @@ class SearchContext():
                 break
         return context
 
+    def get_query_context_rerank(self, query, top_k=10):
+        query_emb = self.get_embedding(query)
+        scores = np.matmul(
+            query_emb,
+            self.doc_embedding.transpose(1, 0))[0]
+        context = []
+        index_list = np.argsort(scores)[::-1]
+        print('='*20)
+        print(query)
+        for index in index_list:
+            doc_text = self.doc_piece_list[index]
+            context.append(doc_text)
+            # rank_score = self.get_rerank_score(query, doc_text)[0]
+            # print(self.doc_piece_list[index].replace("\n", "<n>"), index, scores[index], rank_score)
+            if len(context) == top_k:
+                break
+        return context
+
     def get_query_context_move(self, query, top_k=3):
         query_emb = self.get_embedding(query)
         scores = np.matmul(
@@ -412,22 +430,28 @@ class SearchContext():
         index_list = np.argsort(scores)[::-1]
         print('='*20)
         print(query)
+        new_score = []
         for index in index_list:
             context.append(self.doc_piece_list[index])
             context_span.append(self.offsets[index])
-            print(self.doc_piece_list[index].replace("\n", "<n>"), self.offsets[index], index, scores[index])
+            # rank_score = self.get_rerank_score(query, self.doc_piece_list[index])[0]
+            # new_score.append((rank_score[1], self.doc_piece_list[index].replace("\n", "<n>"), index, scores[index], rank_score))
+            # print(self.doc_piece_list[index].replace("\n", "<n>"), self.offsets[index], index, scores[index], rank_score, np.argmax(rank_score))
             context_span = SearchContext._merge_set(context_span)
-            if sum([a[1] - a[0] for a in context_span]) >= 1200:
+            if sum([a[1] - a[0] for a in context_span]) >= 1000:
                 break
-        print(context_span, sum([a[1] - a[0] for a in context_span]))
+        # print(context_span, sum([a[1] - a[0] for a in context_span]))
+        new_score.sort(key=lambda a:a[0], reverse=True)
+        for data in new_score:
+            print(data)
         context = [tokenizer.decode(self.fulltext[a[0]:a[1]]) for a in context_span]
-        print(context)
+        # print(context)
         return context
 
 class QAContext():
     def __init__(self):
         self.model_name = "QuestionAnswering_onnx"  # 模型目录名/venus注册模型名称
-        address = "10.212.207.33:8000"  # 机器地址
+        address = "10.164.164.172:8000"  # 机器地址
         self.triton_client = httpclient.InferenceServerClient(url=address)
         rm_model_path = "/search/ai/pretrain_models/infoxlm-base/"
         self.tokenizer = AutoTokenizer.from_pretrained(rm_model_path, trust_remote_code=True)

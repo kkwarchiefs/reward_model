@@ -11,8 +11,10 @@ import sys
 import codecs
 import torch
 import tritonclient.http as httpclient
-from transformers import BertTokenizer, AutoTokenizer
+from transformers import AutoTokenizer
 import json
+import pickle
+import numpy as np
 class EmbeddingClent():
     def __init__(self):
         # self.model_name = "embedding_mul_onnx"  # 模型目录名/venus注册模型名称
@@ -25,9 +27,7 @@ class EmbeddingClent():
 
     def get_embedding(self, doc):
         RM_input = self.tokenizer(doc, max_length=512, truncation=True, return_tensors="pt", padding=True)
-        # print(RM_input)
         RM_batch = [torch.tensor(RM_input["input_ids"]).numpy(), torch.tensor(RM_input["attention_mask"]).numpy()]
-
         inputs = []
         inputs.append(httpclient.InferInput('input_ids', list(RM_batch[0].shape), 'INT64'))
         inputs.append(httpclient.InferInput('attention_mask', list(RM_batch[1].shape), 'INT64'))
@@ -98,7 +98,7 @@ def read_json():
     pickle.dump(idx2embed, fout)
     fout.close()
 
-if __name__ == "__main__":
+def read_new():
     fout = open(sys.argv[1], 'wb')
     input_json = []
     client = EmbeddingClent()
@@ -124,3 +124,79 @@ if __name__ == "__main__":
     print(len(idx2embed))
     pickle.dump(idx2embed, fout)
     fout.close()
+
+def read_du():
+    line2idx = json.load(open('/search/ai/jamsluo/passage_rank/DuReader-Retrieval-Baseline/dureader-retrieval-baseline-dataset/passage-collection/passage2id.map.json', 'r'))
+    doc_ins = pickle.load(open('du_passage.pkl', 'rb'))
+    line2text = pickle.load(open('/search/ai/jamsluo/passage_rank/DuReader-Retrieval-Baseline/formate_data/passage_idx.pkl', 'rb'))
+    client = EmbeddingClent()
+    for line in sys.stdin:
+        ins = json.loads(line)
+        name = ins['qry']
+        query_zh = client.get_embedding(ins['zh'])
+        query_en = client.get_embedding(ins['en'])
+        numberidx = ins['pos'] + ins['neg']
+        embeds = []
+        for x in numberidx:
+            newid = line2idx[x]
+            embed = doc_ins.get(newid)
+            if embed is not None:
+                embeds.append(embed)
+        embeds = np.array(embeds)
+        scores = np.matmul(
+            query_zh,
+            embeds.transpose(1, 0))[0]
+        for idx, sc in enumerate(scores):
+            number = numberidx[idx]
+            text = line2text[int(number)]
+            label = 0
+            if number in ins['pos']:
+                label = 1
+            print(name, ins['zh'], text, sc, label, sep='\t')
+        scores = np.matmul(
+            query_en,
+            embeds.transpose(1, 0))[0]
+        for idx, sc in enumerate(scores):
+            number = numberidx[idx]
+            text = line2text[int(number)]
+            label = 0
+            if number in ins['pos']:
+                label = 1
+            print(name, ins['en'], text, sc, label, sep='\t')
+
+if __name__ == "__main__":
+    doc_ins = pickle.load(open('msmarco_passage.pkl', 'rb'))
+    line2text = pickle.load(open('/search/ai/jamsluo/passage_rank/DuReader-Retrieval-Baseline/formate_data/en_passage_idx.pkl', 'rb'))
+    client = EmbeddingClent()
+    for line in sys.stdin:
+        ins = json.loads(line)
+        name = ins['qry']
+        query_zh = client.get_embedding(ins['zh'])
+        query_en = client.get_embedding(ins['en'])
+        numberidx = ins['pos'] + ins['neg']
+        embeds = []
+        for x in numberidx:
+            embed = doc_ins.get(x)
+            if embed is not None:
+                embeds.append(embed)
+        embeds = np.array(embeds)
+        scores = np.matmul(
+            query_zh,
+            embeds.transpose(1, 0))[0]
+        for idx, sc in enumerate(scores):
+            number = numberidx[idx]
+            text = line2text[int(number)]
+            label = 0
+            if number in ins['pos']:
+                label = 1
+            print(name, ins['zh'], text, sc, label, sep='\t')
+        scores = np.matmul(
+            query_en,
+            embeds.transpose(1, 0))[0]
+        for idx, sc in enumerate(scores):
+            number = numberidx[idx]
+            text = line2text[int(number)]
+            label = 0
+            if number in ins['pos']:
+                label = 1
+            print(name, ins['en'], text, sc, label, sep='\t')

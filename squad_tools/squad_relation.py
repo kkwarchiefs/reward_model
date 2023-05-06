@@ -22,13 +22,13 @@ random.seed(8888)
 import json
 import datetime
 d = 768# dimension
-b_fkey = 'msmarco_passage'
+b_fkey = 'du_passage'
 q_fkey = 'squad_query'
 
 root_dir = '/search/ai/jamsluo/passage_rank/all_doc_tools'
 # doclist = ['document_2021092812', 'document_2021093012']
 query_file = 'query_ids.pkl'
-doc_file = 'msmarco_passage.pkl'
+doc_file = 'du_passage.pkl'
 
 
 class SimTextSearch:
@@ -140,10 +140,10 @@ class SimTextSearch:
 
         fw = open('search_res/' + b_fkey + '_' + str(score) + '_retrieval.txt', 'w')
         for k, v in records.items():
-            res = {_v[0] for _v in v if _v[0] != k}
-            res = list(res)
+            # res = {_v[0] for _v in v if _v[0] != k}
+            res = v
             for _res in res:
-                print(k, _res, sep='\t', file=fw)
+                print(k, _res[0], _res[1], sep='\t', file=fw)
         fw.close()
 
 if __name__=="__main__":
