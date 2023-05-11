@@ -262,7 +262,7 @@ class DSU:
 
 class SearchContext():
     def __init__(self):
-        # self.model_name = "embedding_mul_onnx"  # 模型目录名/venus注册模型名称
+        # self.model_name = "embedding_mul_onnx_v2"  # 模型目录名/venus注册模型名称
         self.model_name = "embedding_pooling_onnx"
         self.rerank_name = "rerank_mul_onnx"
         address = "10.164.164.172:8000"  # 机器地址
@@ -297,8 +297,8 @@ class SearchContext():
         return results
 
     def get_doc_embedding_index(self, text):
-        # inputs, self.offsets, self.fulltext = SearchContext.cut_doc_move(text, piece_len=self.piece_len)
-        inputs = SearchContext.cut_doc_plus(text, piece_len=self.piece_len)
+        inputs, self.offsets, self.fulltext = SearchContext.cut_doc_move(text, piece_len=self.piece_len)
+        # inputs = SearchContext.cut_doc_plus(text, piece_len=self.piece_len)
         # print(inputs, offsets)
         self.doc_embedding = self.get_embedding(inputs[:256])
         return inputs
@@ -441,17 +441,16 @@ class SearchContext():
             if sum([a[1] - a[0] for a in context_span]) >= 1000:
                 break
         # print(context_span, sum([a[1] - a[0] for a in context_span]))
-        new_score.sort(key=lambda a:a[0], reverse=True)
-        for data in new_score:
-            print(data)
         context = [tokenizer.decode(self.fulltext[a[0]:a[1]]) for a in context_span]
+        for data in context:
+            print(data)
         # print(context)
         return context
 
 class QAContext():
     def __init__(self):
         self.model_name = "QuestionAnswering_onnx"  # 模型目录名/venus注册模型名称
-        address = "10.164.164.172:8000"  # 机器地址
+        address = "10.164.164.172:89999"  # 机器地址
         self.triton_client = httpclient.InferenceServerClient(url=address)
         rm_model_path = "/search/ai/pretrain_models/infoxlm-base/"
         self.tokenizer = AutoTokenizer.from_pretrained(rm_model_path, trust_remote_code=True)
@@ -461,7 +460,7 @@ class QAContext():
         self.MIN_SENT_LEN = 256
         self.BATCH_SIZE = 64
         self.max_seq_length = 512
-        self.max_content_length = 1300
+        self.max_content_length = 1000
         self.max_span_size = 10
 
     def _break_sentence(self, text: str):
