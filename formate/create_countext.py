@@ -223,22 +223,6 @@ class DSU:
     def union(self, x, y):
         a1 = self.find(x)
         a2 = self.find(y)
-        # if a1[0] >= a2[0] and a1[1] <= a2[1]:
-        #     if a2[2] > a1[2]:
-        #         self.dsu[a1] = a2
-        #     else:
-        #         newa = (a2[0], a2[1], a1[2])
-        #         self.dsu[a1] = newa
-        #         self.dsu[a2] = newa
-        #     return
-        # if a1[0] <= a2[0] and a1[1] >= a2[1]:
-        #     if a1[2] < a2[2]:
-        #         newa = (a1[0], a1[1], a2[2])
-        #         self.dsu[a1] = newa
-        #         self.dsu[a2] = newa
-        #     else:
-        #         self.dsu[a2] = a1
-        #     return
         if (a1[0] <= a2[1] and a1[1] >= a2[1]) or (a1[0] <= a2[0] and a1[1] >= a2[0]):
             newa = (min(a1[0], a2[0]), max(a1[1], a2[1]), max(a1[2], a2[2]))
             self.dsu[a2] = newa
@@ -247,12 +231,6 @@ class DSU:
     def union_pos(self, x, y):
         a1 = self.find(x)
         a2 = self.find(y)
-        # if a1[0] >= a2[0] and a1[1] <= a2[1]:
-        #     self.dsu[a1] = a2
-        #     return
-        # if a1[0] <= a2[0] and a1[1] >= a2[1]:
-        #     self.dsu[a2] = a1
-        #     return
         if (a1[0] <= a2[1] and a1[1] >= a2[1]) or (a1[0] <= a2[0] and a1[1] >= a2[0]):
             newa = (min(a1[0], a2[0]), max(a1[1], a2[1]))
             self.dsu[a2] = newa
@@ -270,8 +248,13 @@ class SearchContext():
         rm_model_path = "/search/ai/pretrain_models/infoxlm-base/"
         self.tokenizer = AutoTokenizer.from_pretrained(rm_model_path, trust_remote_code=True)
         self.piece_len = 330
+        self.punctuation = {'！', '？', '!', '?', '。', ',', ';', '，', '；'}
 
     def refresh_data(self, text):
+        res = langid.classify(text)
+        self.is_chinese = False
+        if res[0] == 'zh':
+            self.is_chinese = True
         self.doc_piece_list = self.get_doc_embedding_index(text)
 
     def get_embedding(self, doc):
@@ -331,9 +314,11 @@ class SearchContext():
         return piece_data
 
     @staticmethod
-    def cut_doc_move(data, piece_len=400):
+    def cut_doc_move(data, piece_len=400, single_piece_max_len=1000):
         tokens = tokenizer(data)
         tokens_ids = tokens['input_ids'][1:-2]
+        if len(tokens_ids) < single_piece_max_len:
+            return [data], [(0, len(tokens_ids))], tokens_ids
         index = 0
         piece_data = []
         piece_half = piece_len // 2
@@ -381,9 +366,9 @@ class SearchContext():
         ins = DSU()
         for i in range(len(spans)):
             for j in range(i + 1, len(spans)):
-                ins.union_pos(spans[i], spans[j])
+                ins.union(spans[i], spans[j])
         spanset = list(set([ins.find(a) for a in spans]))
-        spanset.sort(key=lambda x: x[0])
+        spanset.sort(key=lambda x: x[2], reverse=True)
         return spanset
 
     def get_query_context(self, query, top_k=3):
@@ -420,7 +405,28 @@ class SearchContext():
                 break
         return context
 
+    def move_index(self, allcontext,  first):
+        if allcontext[first] not in self.punctuation:
+            for i in range(1, 30):
+                if allcontext[first+i] in self.punctuation:
+                    first = first + i
+                    break
+                if allcontext[first - i] in self.punctuation:
+                    first = first - i
+                    break
+        return first + 1
+
+    def find_good_split(self, context):
+        first = len(context[0])
+        second = len(context[0] + context[1])
+        allcontext = ''.join(context)
+        first = self.move_index(allcontext, first)
+        second = self.move_index(allcontext, second)
+        return [allcontext[:first], allcontext[first:second], allcontext[second:]]
+
     def get_query_context_move(self, query, top_k=3):
+        if len(self.doc_piece_list) == 1:
+            return self.doc_piece_list
         query_emb = self.get_embedding(query)
         scores = np.matmul(
             query_emb,
@@ -430,18 +436,23 @@ class SearchContext():
         index_list = np.argsort(scores)[::-1]
         print('='*20)
         print(query)
-        new_score = []
         for index in index_list:
             context.append(self.doc_piece_list[index])
-            context_span.append(self.offsets[index])
-            # rank_score = self.get_rerank_score(query, self.doc_piece_list[index])[0]
-            # new_score.append((rank_score[1], self.doc_piece_list[index].replace("\n", "<n>"), index, scores[index], rank_score))
-            # print(self.doc_piece_list[index].replace("\n", "<n>"), self.offsets[index], index, scores[index], rank_score, np.argmax(rank_score))
+            print(self.doc_piece_list[index], scores[index])
+            context_span.append((self.offsets[index][0], self.offsets[index][1], scores[index]))
             context_span = SearchContext._merge_set(context_span)
             if sum([a[1] - a[0] for a in context_span]) >= 1000:
                 break
         # print(context_span, sum([a[1] - a[0] for a in context_span]))
-        context = [tokenizer.decode(self.fulltext[a[0]:a[1]]) for a in context_span]
+        # if not self.is_chinese:
+        tokens = [self.fulltext[a[0]:a[1]] for a in context_span]
+        tokens = sum(tokens, [])
+        context = [tokenizer.decode(tokens[i*self.piece_len:(1+i)*self.piece_len]) for i in range(3)]
+        if self.is_chinese and len(context[-1]) > 0:
+            context = self.find_good_split(context)
+        # else:
+
+        # context = [tokenizer.decode(self.fulltext[a[0]:a[1]]) for a in context_span]
         for data in context:
             print(data)
         # print(context)

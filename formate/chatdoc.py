@@ -307,4 +307,4 @@ def test_mrc():
         print(sea, file=fout)
 
 if __name__ == "__main__":
-    test_mrc()
+    test_move()
