@@ -17,6 +17,8 @@ from typing import Optional, Tuple
 import collections
 import json
 from  bm25_search import  *
+import spacy
+nlp = spacy.load('zh_core_web_sm')
 model_path = "/search/ai/pvopliu/glm_10m/GLM/GLM/convert_scripts/glm_10b_tokenizer"
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 
@@ -212,6 +214,99 @@ class ReaderContext():
         if len(context_chunks) > 3:
             context_chunks = context_chunks[:2] + [''.join(context_chunks[2:])]
         return context_chunks
+
+
+
+class ReaderSummary():
+    def __init__(self):
+        # self.model_name = "embedding_mul_onnx_v2"  # 模型目录名/venus注册模型名称
+        self.model_name = "embedding_pooling_onnx"
+        self.rerank_name = "rerank_mul_onnx"
+        address = "10.164.164.172:8000"  # 机器地址
+        self.triton_client = httpclient.InferenceServerClient(url=address)
+        rm_model_path = "/search/ai/pretrain_models/infoxlm-base/"
+        self.tokenizer = AutoTokenizer.from_pretrained(rm_model_path, trust_remote_code=True)
+        self.piece_len = 64
+
+    def refresh_data(self, text):
+        self.doc_piece_list = self.get_doc_embedding_index(text)
+
+    def get_embedding(self, doc):
+        RM_input = self.tokenizer(doc, max_length=512, truncation=True, return_tensors="pt", padding=True)
+        # print(RM_input)
+        RM_batch = [torch.tensor(RM_input["input_ids"]).numpy(), torch.tensor(RM_input["attention_mask"]).numpy()]
+
+        inputs = []
+        inputs.append(httpclient.InferInput('input_ids', list(RM_batch[0].shape), 'INT64'))
+        inputs.append(httpclient.InferInput('attention_mask', list(RM_batch[1].shape), 'INT64'))
+        inputs[0].set_data_from_numpy(RM_batch[0])
+        inputs[1].set_data_from_numpy(RM_batch[1])
+        output = httpclient.InferRequestedOutput('output')
+        # try:
+        results = self.triton_client.infer(
+            self.model_name,
+            inputs,
+            model_version='1',
+            outputs=[output],
+            request_id='1'
+        )
+        results = results.as_numpy('output')
+        return results
+
+    def get_doc_embedding_index(self, text):
+        # inputs, self.offsets, self.fulltext = ReaderContext.cut_doc_move(text, piece_len=self.piece_len)
+        # inputs = ReaderContext.cut_doc_plus(text, piece_len=self.piece_len)
+        inputs = []
+        doc = nlp(text)
+        for sent in doc.sents:
+            inputs.append(sent.text)
+        # print(inputs, offsets)
+        self.doc_embedding = self.get_embedding(inputs)
+        return inputs
+
+
+    @staticmethod
+    def cut_doc_plus(data, piece_len=400, single_piece_max_len=1000):
+        tokens = tokenizer(data)
+        tokens_ids = tokens['input_ids'][1:-2]
+        # if len(tokens_ids) < single_piece_max_len:
+        #     return [data]
+        index = 0
+        piece_data = []
+        last_index = 0
+        while index < len(tokens_ids):
+            index += piece_len
+            if index < len(tokens_ids):
+                temp_data = tokenizer.decode(tokens_ids[last_index: index])
+            else:
+                temp_data = tokenizer.decode(tokens_ids[last_index:])
+            piece_data.append(temp_data)
+            last_index = index
+        return piece_data
+
+    def get_query_context(self, query, top_k=3):
+        scores = np.matmul(
+            self.doc_embedding,
+            self.doc_embedding.transpose(1, 0))
+        scores[np.diag_indices_from(scores)]=0
+        ranks = scores.sum(1)
+        context = []
+        index_list = np.argsort(ranks)[::-1]
+        print('='*20)
+        print(query)
+        for index in index_list:
+            context.append(self.doc_piece_list[index])
+            print(self.doc_piece_list[index].replace("\n", "<n>"), index, ranks[index])
+            # if len(context) == top_k:
+            #     break
+        return context
+
+    def get_sentence_similarity(self ):
+        for index in range(len(self.doc_piece_list)-1):
+            score = self.doc_embedding[index] * self.doc_embedding[index+1]
+            score = score.sum()
+            print(self.doc_piece_list[index].replace("\n", "<n>"), self.doc_piece_list[index+1].replace("\n", "<n>"), score)
+        return
 
 
 if __name__ == "__main__":

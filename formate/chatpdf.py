@@ -4,7 +4,7 @@ import torch
 import tritonclient.http as httpclient
 from transformers import BertTokenizer, AutoTokenizer
 import random
-#model_name = "embedding_mul_onnx"  # 模型目录名/venus注册模型名称
+#model_name = "embedding_mul_onnx_v2"  # 模型目录名/venus注册模型名称
 model_name = "embedding_pooling_onnx"  # 模型目录名/venus注册模型名称
 address = "10.164.164.172:8000"  # 机器地址
 triton_client = httpclient.InferenceServerClient(url=address)
@@ -30,7 +30,7 @@ class ChatPdf():
 
     def get_summary(self, data):
         max_len = 1000
-        piece_data = self.cut_doc_plus(data, piece_len=750, single_piece_max_len=max_len, return_only_one=True)
+        piece_data = self.cut_doc_plus(data, piece_len=500, single_piece_max_len=max_len, return_only_two=True)
         final_sum_content = []
         if len(piece_data) == 1:
             final_sum_content.append("第1部分{}内容：".format(self.content_name) + piece_data[0])
@@ -47,8 +47,9 @@ class ChatPdf():
                 if len(" ".join(final_sum_content))-20>=max_len:
                     print ("total sum max len")
                     break
+        #final_sum_content.append("根据上面各个部分内容的介绍生成整个{}的摘要，在摘要开头用“帮你省流：”，之后将要点以“1. ”、“2. ”、“3. ”为开头共三点分别列出来。均需要换行".format(self.content_name))
         final_sum_content.append("根据上面各个部分内容的介绍生成整个{}的摘要".format(self.content_name))
-        # print ("<n>".join(final_sum_content).replace("\n", "<n>"))
+        print ("<n>".join(final_sum_content).replace("\n", "<n>"))
         summ = self.glm_inference("<n>".join(final_sum_content).replace("\n", "<n>"))
         return summ
     '''def get_question(self, data):
@@ -94,7 +95,8 @@ class ChatPdf():
         print (sft_prompt.replace("\n", "<n>"))
         query_ans = self.glm_inference(sft_prompt.replace("\n", "<n>"))
         self.history.append([query, query_ans])
-        return query_ans
+        return query_ans, sft_prompt.replace("\n", "<n>")
+
     def query_rewrite(self, query):
         if len(self.history)==0:
             return query
@@ -124,7 +126,7 @@ class ChatPdf():
         return context
 
     def get_embedding(self, doc):
-        RM_input = tokenizer(doc, max_length=512, truncation=True, return_tensors="pt", padding=True)
+        RM_input = tokenizer(doc[0:256], max_length=512, truncation=True, return_tensors="pt", padding=True)
         # print(RM_input)
         RM_batch = [torch.tensor(RM_input["input_ids"]).numpy(), torch.tensor(RM_input["attention_mask"]).numpy()]
 
@@ -188,15 +190,18 @@ class ChatPdf():
             index += piece_len
         return piece_data
 
-    def cut_doc_plus(self, data, piece_len=750, single_piece_max_len=1500, return_only_one=False):
+    def cut_doc_plus(self, data, piece_len=750, single_piece_max_len=1500, return_only_one=False, return_only_two=False):
         tokens = tokenizer_glm(data)
-        tokens_ids = tokens['input_ids'][1:-2]
+        tokens_ids = tokens['input_ids'][1:-1]
+        # print (tokens_ids[0:2000])
         if len(tokens_ids) < single_piece_max_len:
             return [data]
         if return_only_one:
             #num = int(single_piece_max_len/3)
             #return [tokenizer_glm.decode(tokens_ids[0:2*num] + tokens_ids[-num:])]
             return [tokenizer_glm.decode(tokens_ids[0:single_piece_max_len])]
+        if return_only_two:
+            return [tokenizer_glm.decode(tokens_ids[0:piece_len]) + " ... " + tokenizer_glm.decode(tokens_ids[-piece_len:])]
         index = 0 
         piece_data = []
         last_index = 0 
@@ -208,4 +213,5 @@ class ChatPdf():
                 temp_data = tokenizer_glm.decode(tokens_ids[last_index:])
             piece_data.append(temp_data)
             last_index = index
+        # print (piece_data[0:5])
         return piece_data

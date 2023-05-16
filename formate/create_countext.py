@@ -756,7 +756,7 @@ class QAContext():
             }
 
         all_nbest_json = self._process(example_batch)
-        # print(all_nbest_json)
+        print(all_nbest_json)
         all_span = []
         for k, vlist in all_nbest_json.items():
             start = 0

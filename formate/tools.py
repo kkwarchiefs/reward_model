@@ -14,13 +14,13 @@ import codecs
 import os
 import random
 
-from online_incontent import ReaderContext
+# from online_incontent import ReaderContext
 import random
 import hashlib
 
-from transformers import AutoTokenizer
-model_path = "/search/ai/pvopliu/glm_10m/GLM/GLM/convert_scripts/glm_10b_tokenizer"
-tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+# from transformers import AutoTokenizer
+# model_path = "/search/ai/pvopliu/glm_10m/GLM/GLM/convert_scripts/glm_10b_tokenizer"
+# tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 def get_md5(sign):
     instance = hashlib.md5()
     instance.update(sign.encode("utf-8"))
@@ -134,7 +134,7 @@ def tools():
         except:
             pass
 
-if __name__ == "__main__":
+def second():
     import json
     main2part = collections.defaultdict(list)
     parts2main = {}
@@ -165,3 +165,16 @@ if __name__ == "__main__":
                 while neg == pos:
                     neg = random.choice(all_doc)
                 print(change, pos, neg, sep='\t')
+
+if __name__ == "__main__":
+    for line in sys.stdin:
+        line = line.replace('\t', ' ')
+        items = line.strip().split('\x01')
+        querys = eval(items[2])
+        res = eval(items[3])
+        new = []
+        for a,b in zip(querys,res):
+            new.append(a)
+            new.append(b[1])
+            new.append(b[0])
+        print(items[0], items[1], '\t'.join(new), sep='\t')

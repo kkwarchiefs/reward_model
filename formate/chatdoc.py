@@ -13,7 +13,7 @@ import pandas as pd
 from collections import defaultdict
 from create_countext import *
 from doc_index import RerankContext
-from online_incontent import ReaderContext
+from online_incontent import ReaderContext, ReaderSummary
 
 def test():
     ins = pd.read_csv(sys.argv[1], header=None)
@@ -306,5 +306,17 @@ def test_mrc():
         # print(query, [rel, sea, qas], sea > qas,  sep='\t', file=fout)
         print(sea, file=fout)
 
+def test_summary():
+    ins = ReaderSummary()
+    while True:
+        path = input("请输入文件：")
+        input_text = open(path).read().replace('\n', '')
+        ins.refresh_data(input_text)
+        while True:
+            query = input("\n请输入问题, 输入exit结束：")
+            if query=="exit":
+                break
+            ins.get_sentence_similarity()
+
 if __name__ == "__main__":
-    test_move()
+    test_summary()
