@@ -11,6 +11,7 @@ import sys
 import codecs
 import json
 import re
+from collections import defaultdict
 def show():
     key = 0
     with open(sys.argv[1], encoding="utf-8") as f:
@@ -138,5 +139,24 @@ def make_compare():
         print('*'*10)
         print(sent)
         print(filter)
+
+
+def make_trans_data():
+    content2detail = {}
+    for idx, line in enumerate(sys.stdin):
+        ins = json.loads(line)
+        response = ins['response']
+        try:
+            resp = json.loads(response)
+            convert_sentence = resp['新句子']
+        except:
+            continue
+        if len(convert_sentence) > 200:
+            continue
+        ins = content2detail.get(ins['content'], {})
+        origin = ins.get('sentence', [])
+        origin.append((ins["sentence"], convert_sentence, ins['index']))
+    for key, value in content2detail.items():
+
 if __name__ == "__main__":
     make_pred()
