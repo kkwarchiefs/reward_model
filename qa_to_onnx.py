@@ -10,7 +10,7 @@ from modeling_cpt import CPTForSequenceClassification, CPTForQuestionAnswering
 from transformers import BertTokenizer
 parser = argparse.ArgumentParser()
 
-model_name = "QuestionAnswering_onnx"
+model_name = "TextReference_onnx"
 device = torch.device('cuda:0')
 
 
@@ -29,7 +29,7 @@ question_column_name = "question"
 context_column_name = "context"
 answer_column_name = "answers"
 pad_on_right = tokenizer.padding_side == "right"
-max_seq_length =384
+max_seq_length =512
 
 
 def prepare_train_features(examples):

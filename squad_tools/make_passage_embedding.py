@@ -19,7 +19,7 @@ class EmbeddingClent():
     def __init__(self):
         # self.model_name = "embedding_mul_onnx"  # 模型目录名/venus注册模型名称
         self.model_name = "embedding_pooling_onnx"
-        address = "10.212.207.33:8000"  # 机器地址
+        address = "10.164.164.172:8000"  # 机器地址
         self.triton_client = httpclient.InferenceServerClient(url=address)
         rm_model_path = "/search/ai/pretrain_models/infoxlm-base/"
         self.tokenizer = AutoTokenizer.from_pretrained(rm_model_path, trust_remote_code=True)
@@ -164,7 +164,7 @@ def read_du():
                 label = 1
             print(name, ins['en'], text, sc, label, sep='\t')
 
-if __name__ == "__main__":
+def compare():
     doc_ins = pickle.load(open('msmarco_passage.pkl', 'rb'))
     line2text = pickle.load(open('/search/ai/jamsluo/passage_rank/DuReader-Retrieval-Baseline/formate_data/en_passage_idx.pkl', 'rb'))
     client = EmbeddingClent()
@@ -200,3 +200,62 @@ if __name__ == "__main__":
             if number in ins['pos']:
                 label = 1
             print(name, ins['en'], text, sc, label, sep='\t')
+
+def markdown_table():
+    fout = open(sys.argv[1], 'wb')
+    input_json = []
+    client = EmbeddingClent()
+    idx2embed = {}
+    import time
+    import pickle
+    now = time.time()
+    for line in sys.stdin:
+        input_json.append(line)
+        if len(input_json) == 200:
+            ids, texts =[], []
+            for a in input_json:
+                ins = json.loads(a)
+                ids.append(ins['idx'])
+                texts.append(ins['table'])
+            results = client.get_embedding(texts)
+            if results is not None:
+                for x, y in zip(ids, results):
+                    idx2embed[x] = y
+            input_json = []
+    if len(input_json):
+        ids, texts = [], []
+        for a in input_json:
+            ins = json.loads(a)
+            ids.append(ins['idx'])
+            texts.append(ins['table'])
+        results = client.get_embedding(texts)
+        if results is not None:
+            for x, y in zip(ids, results):
+                idx2embed[x] = y
+    print(len(idx2embed))
+    pickle.dump(idx2embed, fout)
+    fout.close()
+
+if __name__ == "__main__":
+    doc_ins = pickle.load(open('table_data/mk_table.pkl', 'rb'))
+    embeds = [a for a in doc_ins.values()]
+    numberidx = [a for a in doc_ins.keys()]
+    embeds = np.array(embeds)
+    client = EmbeddingClent()
+    for line in sys.stdin:
+        ins = json.loads(line)
+        tableid = "Table_"+ins['table_id']
+        question = ins['question']
+        query_embeding = client.get_embedding(question)
+        ins['pos'] = [tableid]
+        scores = np.matmul(
+            query_embeding,
+            embeds.transpose(1, 0))[0]
+        index_list = np.argsort(scores)[::-1]
+        negs = []
+        for idx in index_list[:20]:
+            number = numberidx[idx]
+            score = float(scores[idx])
+            negs.append((number, score))
+        ins['neg'] = negs
+        print(json.dumps(ins, ensure_ascii=False))
