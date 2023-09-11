@@ -64,7 +64,8 @@ def make_data():
             convert_sentence = resp['新句子']
         except:
             continue
-        if len(convert_sentence) > 200:
+        if len(convert_sentence) > 200 or len(convert_sentence) < len(ins["sentence"]) / 3 or len(convert_sentence) > len(ins["sentence"]) * 2:
+            print(convert_sentence, '#####', ins["sentence"], file=sys.stderr)
             continue
         try:
             text = find_match(convert_sentence, ins["sentence"])
@@ -131,17 +132,19 @@ def make_compare():
     squad = json.load(open(sys.argv[2]))
     key2detail = {}
     for key, res in squad.items():
-        filter = [a for a in res if len(a['text']) > 5]
+        filter = [a for a in res if len(a['text']) > 3]
         # key2detail[key] = filter
         sent = idx2query[key]
         content = idx2content[key]
-        print(content)
-        print('*'*10)
-        print(sent)
-        print(filter)
+        if len(filter) == 0:
+            filter = ['NULL']
+        res = [content, sent, str(filter[0])]
+        res = [a.replace('\t','').replace('\n','<n>') for a in res]
+        print('\t'.join(res))
 
 
 def make_trans_data():
+    prompt = """%s\nTranslate the above text into English:"""
     content2detail = {}
     for idx, line in enumerate(sys.stdin):
         ins = json.loads(line)
@@ -153,10 +156,47 @@ def make_trans_data():
             continue
         if len(convert_sentence) > 200:
             continue
-        ins = content2detail.get(ins['content'], {})
-        origin = ins.get('sentence', [])
-        origin.append((ins["sentence"], convert_sentence, ins['index']))
+        if ins['context'] not in content2detail:
+            content2detail[ins['context']] = [(ins["sentence"], convert_sentence, ins['index'])]
+        else:
+            content2detail[ins['context']].append((ins["sentence"], convert_sentence, ins['index']))
+    # print(len(content2detail))
     for key, value in content2detail.items():
+        value.sort(key=lambda x:x[2])
+        context = key
+        last = 0
+        part = 0
+        for idx, tup in enumerate(value):
+            start = context.find(tup[0])
+            prefix = context[last: start]
+            ins = {
+                'context': prefix,
+                'index': get_md5(context) + '\x01' + str(part),
+                'sentences': value,
+                'prompt': prompt % prefix,
+            }
+            print(json.dumps(ins, ensure_ascii=False))
+            part += 1
+            ins = {
+                'context': tup[0],
+                'index': get_md5(context) + '\x01' + str(part),
+                'sentences': value,
+                'prompt': prompt % tup[0],
+            }
+            print(json.dumps(ins, ensure_ascii=False))
+            part += 1
+            last = start + len(tup[0])
+        if last < len(context) - 20:
+            ins = {
+                'context': context[last:],
+                'index': get_md5(context) + '\x01' + str(part),
+                'sentences': value,
+                'prompt': prompt % context[last:],
+            }
+            print(json.dumps(ins, ensure_ascii=False))
+            part += 1
+
+
 
 if __name__ == "__main__":
-    make_pred()
+    make_compare()

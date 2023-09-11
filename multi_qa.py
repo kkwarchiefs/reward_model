@@ -230,7 +230,7 @@ def main():
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
-    send_example_telemetry("run_qa", model_args, data_args)
+    # send_example_telemetry("run_qa", model_args, data_args)
 
     # Setup logging
     logging.basicConfig(
@@ -274,6 +274,7 @@ def main():
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
+    metric = evaluate.load("/search/ai/jamsluo/GLM_RLHF/reward_model/evaluate-metric--squad_v2/bd2753381689b3f5bd1f4d85d23b9e2764cf7a26ca1821bcc729f1ee660d1560/squad_v2.py")
 
     # Get the datasets: you can either provide your own CSV/JSON/TXT training and evaluation files (see below)
     # or just provide the name of one of the public datasets available on the hub at https://huggingface.co/datasets/
@@ -467,6 +468,7 @@ def main():
                 load_from_cache_file=not data_args.overwrite_cache,
                 desc="Running tokenizer on train dataset",
             )
+        train_dataset.shuffle(seed=training_args.seed)
         if data_args.max_train_samples is not None:
             # Number of samples might increase during Feature Creation, We select only specified max samples
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
@@ -599,7 +601,6 @@ def main():
         references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in examples]
         return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
-    metric = evaluate.load("squad_v2" if data_args.version_2_with_negative else "squad")
 
     def compute_metrics(p: EvalPrediction):
         return metric.compute(predictions=p.predictions, references=p.label_ids)

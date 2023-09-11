@@ -414,16 +414,49 @@ torchrun --nnodes 1 --nproc_per_node 8 multi_qa.py \
   --do_train \
   --do_eval \
   --do_predict \
-  --per_device_train_batch_size 40 \
+  --per_device_train_batch_size 70 \
   --logging_steps 20 \
   --learning_rate 3e-5 \
   --num_train_epochs 5 \
   --max_seq_length 512  \
   --doc_stride 128 \
+  --overwrite_cache True \
   --max_answer_length 128 \
   --overwrite_output_dir \
   --version_2_with_negative \
   --evaluation_strategy epoch \
+  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/suqad_toolgpt_rel_multi_lang
+
+
+torchrun --nnodes 1 --nproc_per_node 8 multi_qa.py \
+  --model_name_or_path /search/ai/pretrain_models/infoxlm-base/ \
+  --dataset_name squad_rel_en.py \
+  --do_train \
+  --do_eval \
+  --per_device_train_batch_size 70 \
+  --logging_steps 20 \
+  --learning_rate 3e-5 \
+  --num_train_epochs 3 \
+  --max_seq_length 512  \
+  --doc_stride 128 \
+  --overwrite_cache True \
+  --max_answer_length 128 \
+  --overwrite_output_dir \
+  --version_2_with_negative \
+  --evaluation_strategy epoch \
+  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/suqad_toolgpt_rel_English
+
+
+CUDA_VISIBLE_DEVICES=0  python3 multi_qa.py \
+  --model_name_or_path /search/ai/jamsluo/GLM_RLHF/reward_model/output/suqad_toolgpt_rel \
+  --dataset_name squad_rel.py \
+  --do_predict \
+  --logging_steps 20 \
+  --max_seq_length 512  \
+  --doc_stride 128 \
+  --overwrite_cache True \
+  --max_answer_length 128 \
+  --version_2_with_negative \
   --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/suqad_toolgpt_rel
 
 
