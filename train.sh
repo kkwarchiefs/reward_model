@@ -408,24 +408,27 @@ python3 -m torch.distributed.launch --nproc_per_node 8 multi_qa.py \
   --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/squad_cmrc_du_wiki_nyt
 
 
-torchrun --nnodes 1 --nproc_per_node 8 multi_qa.py \
+torchrun --nnodes 1 --nproc_per_node 4 multi_qa.py \
   --model_name_or_path /search/ai/pretrain_models/infoxlm-base/ \
   --dataset_name squad_rel.py \
   --do_train \
   --do_eval \
   --do_predict \
-  --per_device_train_batch_size 70 \
+  --per_device_train_batch_size 50 \
   --logging_steps 20 \
   --learning_rate 3e-5 \
   --num_train_epochs 5 \
+  --lr_scheduler_type cosine \
   --max_seq_length 512  \
   --doc_stride 128 \
+  --seed 66 \
   --overwrite_cache True \
   --max_answer_length 128 \
   --overwrite_output_dir \
   --version_2_with_negative \
   --evaluation_strategy epoch \
-  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/suqad_toolgpt_rel_multi_lang
+  --save_strategy epoch \
+  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/suqad_toolgpt_rel_multi_lang_v6
 
 
 torchrun --nnodes 1 --nproc_per_node 8 multi_qa.py \

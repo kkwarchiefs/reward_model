@@ -67,11 +67,12 @@ def make_data():
         if len(convert_sentence) > 200 or len(convert_sentence) < len(ins["sentence"]) / 3 or len(convert_sentence) > len(ins["sentence"]) * 2:
             print(convert_sentence, '#####', ins["sentence"], file=sys.stderr)
             continue
-        try:
-            text = find_match(convert_sentence, ins["sentence"])
-        except:
-            print(convert_sentence, ins["sentence"], file=sys.stderr)
-            continue
+        # try:
+        #     text = find_match(convert_sentence, ins["sentence"])
+        # except:
+        #     print(convert_sentence, ins["sentence"], file=sys.stderr)
+        #     continue
+        text = ins["sentence"].strip()
         new_index = ins['context'].find(text)
         if new_index == -1:
             continue

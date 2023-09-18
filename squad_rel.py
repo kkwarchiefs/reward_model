@@ -70,7 +70,7 @@ class Squad(datasets.GeneratorBasedBuilder):
     BUILDER_CONFIGS = [
         SquadConfig(
             name="squad_rel",
-            version=datasets.Version("1.0.0", ""),
+            version=datasets.Version("1.1.0", ""),
             description="Plain text",
         ),
     ]
@@ -109,9 +109,9 @@ class Squad(datasets.GeneratorBasedBuilder):
 
         return [
             datasets.SplitGenerator(name=datasets.Split.TRAIN,
-                                    gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/rel_data/train.json'}),
+                                    gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/rel_data/train.6.json'}),
             datasets.SplitGenerator(name=datasets.Split.VALIDATION,
-                                    gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/rel_data/dev.json'}),
+                                    gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/rel_data/dev.2.json'}),
             datasets.SplitGenerator(name=datasets.Split.TEST,
                                     gen_kwargs={
                                         "filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/rel_data/pred.json'}),
