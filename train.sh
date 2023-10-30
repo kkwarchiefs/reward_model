@@ -428,7 +428,7 @@ torchrun --nnodes 1 --nproc_per_node 4 multi_qa.py \
   --version_2_with_negative \
   --evaluation_strategy epoch \
   --save_strategy epoch \
-  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/suqad_toolgpt_rel_multi_lang_v6
+  --output_dir /search/ai/jamsluo/GLM_RLHF/reward_model/output/suqad_toolgpt_rel_multi_lang_human_corr
 
 
 torchrun --nnodes 1 --nproc_per_node 8 multi_qa.py \

@@ -109,7 +109,7 @@ class Squad(datasets.GeneratorBasedBuilder):
 
         return [
             datasets.SplitGenerator(name=datasets.Split.TRAIN,
-                                    gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/rel_data/train.6.json'}),
+                                    gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/rel_data/train_auto_human_v1.json'}),
             datasets.SplitGenerator(name=datasets.Split.VALIDATION,
                                     gen_kwargs={"filepath": '/search/ai/jamsluo/GLM_RLHF/reward_model/rel_data/dev.2.json'}),
             datasets.SplitGenerator(name=datasets.Split.TEST,

@@ -468,7 +468,7 @@ def main():
                 load_from_cache_file=not data_args.overwrite_cache,
                 desc="Running tokenizer on train dataset",
             )
-        train_dataset.shuffle(seed=training_args.seed)
+        train_dataset = train_dataset.shuffle(seed=training_args.seed)
         if data_args.max_train_samples is not None:
             # Number of samples might increase during Feature Creation, We select only specified max samples
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
